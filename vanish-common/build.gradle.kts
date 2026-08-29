@@ -14,8 +14,13 @@ java {
 dependencies {
     implementation("redis.clients:jedis:8.0.1")
     implementation("com.google.code.gson:gson:2.14.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.3")
 }
 
+tasks.test {
+    useJUnitPlatform()
+}
 checkstyle {
     toolVersion = "13.11.0"
     config = resources.text.fromUri(
