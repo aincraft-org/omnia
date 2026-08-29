@@ -22,7 +22,7 @@ Velocity's `state-file` is a strict JSON object with exactly these fields:
 
 `version` is a non-negative integer. `vanished` maps canonical UUID strings to booleans. Unknown fields, malformed JSON, trailing content, negative versions, non-canonical UUIDs, and non-boolean values are rejected. The writer uses a temporary file and atomic replacement.
 
-A missing file starts as an empty valid state. A corrupt or unreadable file is moved beside the configured `state-file` path using the original filename plus `.bak` (for the default `vanish-state.json`, this is `vanish-state.json.bak`; an existing backup receives a UUID suffix). The proxy then uses an empty invalid state, disables mutations and Redis publication, and does not register the active proxy handlers. This fail-closed path prevents an uncertain state from being exposed. Investigate the backup, repair or remove the original only while the proxy is stopped, and restart the proxy.
+A missing file starts as an empty valid state. A corrupt or unreadable file is moved beside the configured `state-file` path using the original filename plus `.bak` (for the default `vanish-state.json`, this is `vanish-state.json.bak`; an existing backup receives a UUID suffix). The proxy attempts a fallback copy if the move fails, but preservation can still fail; verify that the backup exists, and be prepared for manual recovery of the original if it does not. Regardless, the proxy uses an empty invalid state, disables mutations and Redis publication, and does not register the active proxy handlers. This fail-closed path prevents an uncertain state from being exposed. Investigate any preserved file, repair or remove the original only while the proxy is stopped, and restart the proxy.
 
 ## Redis protocol
 

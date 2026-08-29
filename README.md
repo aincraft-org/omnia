@@ -144,7 +144,7 @@ The Velocity `state-file` is **not** the Redis envelope. It must be a strict JSO
 - Unknown top-level fields, non-canonical UUIDs, non-boolean values, negative versions, trailing JSON, or malformed JSON are rejected.
 - Writes use a temporary file and atomic replacement.
 
-If the file is corrupt or unreadable, the proxy preserves it beside the configured `state-file` path using the original filename plus `.bak` (for the default `vanish-state.json`, this is `vanish-state.json.bak`; an existing backup receives a unique UUID suffix), loads an empty invalid state, disables mutations and Redis publication, and does not register the active proxy handlers. This is fail-closed recovery: repair or remove the preserved backup only after investigating it, then restart the proxy. Do not hand-edit a live file while the proxy is running.
+If the file is corrupt or unreadable, the proxy attempts to preserve it beside the configured `state-file` path using the original filename plus `.bak` (for the default `vanish-state.json`, this is `vanish-state.json.bak`; an existing backup receives a unique UUID suffix). Verify that this backup exists: if both the move and fallback copy fail, the original may require manual recovery and no backup path is available. In either case, the store loads an empty invalid state, disables mutations and Redis publication, and does not register the active proxy handlers. This is fail-closed recovery: repair or remove the preserved file only after investigating it, then restart the proxy. Do not hand-edit a live file while the proxy is running.
 
 ## Evidence and limitations
 
