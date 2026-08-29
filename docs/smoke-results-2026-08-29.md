@@ -122,6 +122,7 @@ PASS
 Exact generator and verification commands (run in this order; no server process was started by either command):
 
 ```bash
+set -euo pipefail
 BASE=/tmp/vanish-nopacket-task8 PROXY_PORT=25575 BACKENDS='alpha beta' \
   PORT_ALPHA=30167 PORT_BETA=30168 PROXY_ONLINE_MODE=false \
   bash -c '. /home/jlo/dev/omnia/.agents/skills/development-network/bin/velocity-toml.sh && write_velocity_toml'
@@ -141,15 +142,15 @@ for f in "$BASE/runtime/lobby/config/paper-global.yml" \
   test "$(sed -n 's/^    online-mode: //p' "$f")" = false
   test "$(sed -n 's/^    secret: //p' "$f")" = '"dev-local-forwarding-secret-change-me"'
 done
-echo PASS
+printf 'preflight_result=PASS\n'
 ```
 
 Ordered timestamp evidence from the final pre-start gate:
 
 ```text
-preflight_started_utc=2026-08-29T13:02:25Z
-velocity_config=2026-08-29 05:53:25.783827033 -0700 /tmp/vanish-nopacket-task8/runtime/velocity.toml
-forwarding_secret=2026-08-29 05:53:25.781940704 -0700 /tmp/vanish-nopacket-task8/runtime/forwarding.secret
+preflight_started_utc=2026-08-29T13:11:43Z
+velocity_config=2026-08-29 06:11:43.621165959 -0700 /tmp/vanish-nopacket-task8/runtime/velocity.toml
+forwarding_secret=2026-08-29 06:11:43.618901000 -0700 /tmp/vanish-nopacket-task8/runtime/forwarding.secret
 2026-08-29 05:53:25.556744140 -0700 /tmp/vanish-nopacket-task8/runtime/lobby/server.properties
 2026-08-29 05:53:25.557744150 -0700 /tmp/vanish-nopacket-task8/runtime/auto/alpha/server.properties
 2026-08-29 05:53:25.558806594 -0700 /tmp/vanish-nopacket-task8/runtime/auto/beta/server.properties
@@ -157,9 +158,9 @@ forwarding_secret=2026-08-29 05:53:25.781940704 -0700 /tmp/vanish-nopacket-task8
 2026-08-29 05:53:25.557744150 -0700 /tmp/vanish-nopacket-task8/runtime/auto/alpha/config/paper-global.yml
 2026-08-29 05:53:25.558806594 -0700 /tmp/vanish-nopacket-task8/runtime/auto/beta/config/paper-global.yml
 preflight_result=PASS
-network_attempt_started_utc=2026-08-29T13:02:25Z
+network_attempt_started_utc=2026-08-29T13:11:43Z
 network_attempt_exit=1
-network_attempt_finished_utc=2026-08-29T13:02:25Z
+network_attempt_finished_utc=2026-08-29T13:11:43Z
 ```
 
 Required-port evidence, collected before the attempt:

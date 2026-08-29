@@ -1,6 +1,6 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.gradle.api.tasks.Copy
-
+import org.gradle.language.jvm.tasks.ProcessResources
 
 plugins {
     java
