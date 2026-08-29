@@ -6,7 +6,7 @@ The isolated alternate-port network started and accepted two local offline proto
 
 - The local probe observed tab-list packets, not a separately attributable entity-spawn/entity-destroy proof.
 - The destination transition emitted a `Target` player-info add immediately followed by a player-remove at the same client timestamp. I do not claim a no-flicker or one-Paper-tick guarantee from this probe.
-- Redis transport subscribers reconnected after an owned Redis restart, but the ephemeral durable snapshot key was not restored. The subsequent `/vanish` request was rejected with `Redis snapshot key is missing`.
+- The initial Redis restart attempt (before the reconnect-repair fix) restored subscribers but not the ephemeral snapshot key; the fixed-artifact follow-up below passes the retry/repair check.
 - Proxy restart/config-reload, permission exemption/revocation, `/vservers`, and the full negative/online-backend matrix were not exercised.
 
 The previous required-port `BLOCKED` record in `docs/smoke-results-2026-08-29.md` was preserved.
@@ -123,13 +123,13 @@ GET vanish:state:snapshot
 {"schema":1,"type":"vanish_state","version":2,"vanished":[]}
 ```
 
-During the outage, Velocity logged `Vanish Redis disconnected` and Paper logged `Redis subscriber disconnected; retrying` with `JedisConnectionException`; after the restart, `redis-cli ping` again returned `PONG` and `PUBSUB NUMSUB` returned the same `1/2/2` subscriber counts. However, because the Redis container was intentionally ephemeral, the durable key was initially absent. The reconnect repair attempt logged `Unable to repair the Redis vanish snapshot` after an end-of-stream race, and `GET vanish:state:snapshot` remained nil. A subsequent local Target client attempt received:
+During the outage, Velocity logged `Vanish Redis disconnected` and Paper logged `Redis subscriber disconnected; retrying` with `JedisConnectionException`; after the restart, `redis-cli ping` returned `PONG` and `PUBSUB NUMSUB` returned the same `1/2/2` subscriber counts. Because this first run used an intentionally ephemeral Redis container and the pre-fix artifact, the durable key remained absent. The reconnect repair attempt logged `Unable to repair the Redis vanish snapshot` after an end-of-stream race, and `GET vanish:state:snapshot` remained nil. A subsequent local Target client attempt received:
 
 ```text
 Vanish authority request failed: Redis snapshot key is missing
 ```
 
-Thus Redis TCP/subscriber reconnect was observed, but durable snapshot repair and post-restart mutation were **not a PASS**.
+This initial pre-fix run observed Redis TCP/subscriber reconnect, but durable snapshot repair and post-restart mutation were **not a PASS**. The fixed-artifact retry result is recorded in `## Fixed-artifact follow-up`.
 
 ## Smoke assessment
 
@@ -145,7 +145,7 @@ Thus Redis TCP/subscriber reconnect was observed, but durable snapshot repair an
 | Observer-side hide after Target moves alpha -> beta | PARTIAL; `player_info` add then `player_remove` observed at the same client timestamp |
 | Separate entity hiding proof | NOT PROVEN; no correlated entity packet was captured |
 | Unvanish restoration | PASS at tab-packet level; `player_info action=29` observed by both clients |
-| Redis restart and subscriber resync | BLOCKED/NOT PASS; subscribers returned but snapshot key repair failed |
+| Redis restart and subscriber resync | PASS in fixed follow-up; initial pre-fix run was not a pass |
 | Proxy restart and JSON reload | BLOCKED; not exercised as a client scenario |
 | Permission see exemption/revocation | BLOCKED; not exercised |
 | `/vservers`/`/vanishservers` filtering | BLOCKED; not exercised |
@@ -163,3 +163,40 @@ container filter vanish-live-redis-20260829: no output
 ```
 
 No user-owned listener or service was stopped or modified.
+
+## Fixed-artifact follow-up
+
+The first live run exposed a real reconnect defect: if the first Velocity durable-snapshot write after Redis reconnect failed, `onRedisConnected()` logged the failure and never retried. A regression test now covers one transient write failure:
+
+```text
+./gradlew :vanish-velocity:test --tests io.github.aincraft.vanish.velocity.RedisVelocityServiceTest.transientReconnectFailureRetriesSnapshotRepair
+BUILD SUCCESSFUL
+```
+
+The fix retries snapshot repair with bounded backoff and stops scheduling after shutdown. The rebuilt Velocity shadow jar used for the follow-up was:
+
+```text
+536614f9527aa57b75d06d685f99611998c15165889056eb2e18b4b360c1a05b
+```
+
+A second task-owned runtime used proxy `28176`, lobby `38171`, alpha `38169`, beta `38170`, and Redis `16380`; all shared harness and user-owned endpoints remained untouched. It loaded the current Paper shadow jar and the fixed Velocity shadow jar. The temporary Node probe at `/tmp/vanish-nopacket-live-20260829/node-client/live_vanish_rerun.js` used `minecraft-protocol@1.68.0` under `/tmp` only and overrode the handshake protocol to `776` for the local offline test clients.
+
+Selected follow-up observations from `/tmp/vanish-nopacket-live-20260829/node-client/live_vanish_rerun.log`:
+
+1. `Target` and `Observer` logged in through Velocity, reached alpha through `/server alpha`, and Observer received Target's `player_info action=255` entry at `11.242s` before the transition.
+2. Target sent `/vanish` at `18.154s`; Observer received `player_remove` for Target at `18.167s`, and Target received `Target is now vanished.` at `18.176s`.
+3. Target sent `/server beta` at `24.154s` and received beta's play login at `24.694s`. The observer-side alpha session removed Target during the cross-backend departure.
+4. Target sent `/vanish` on beta at `32.154s`; both clients received `player_info action=29` for Target at `32.162s`, and Target received `Target is now visible.` at `32.175s`. This confirms beta had the authoritative vanished state before the command toggled it visible.
+5. Observer then sent `/server beta` at `36.154s`, received a beta play login at `36.239s`, and received Target in the beta tab list at `36.240s`. Target vanished again at `44.175s`; both clients received `player_remove` for Target at `44.190s`/`44.191s` and Target received the vanished acknowledgement at `44.235s`.
+
+The probe emitted known 26.1/26.2 schema-size warnings, so the report relies only on the explicitly decoded login, server-chat, player-info, and player-remove packets. It proves real two-client Velocity routing and Paper-managed tab masking/restoration; it does not prove a separately attributable entity-spawn/entity-destroy transition, no-flicker timing, or a one-Paper-tick guarantee.
+
+The fixed Redis reconnect check started the proxy with the prior durable state at version `3`, stopped the task-owned ephemeral Redis container, started a fresh container, and observed the fixed proxy's retry path restore the key. `GET vanish:state:snapshot` before and after repair returned:
+
+```text
+{"schema":1,"type":"vanish_state","version":3,"vanished":["db958d5e-bde2-36ef-8ccd-8577d5387953"]}
+```
+
+Velocity logs recorded one failed repair attempt followed by the delayed retry. This proves reconnect repair for the current artifact; it does not claim Redis can retain a key after its own storage is destroyed.
+
+The original required-port run and the first ephemeral Redis restart failure remain preserved as historical evidence. Proxy JSON reload, permission see exemption/revocation, `/vservers`/`/vanishservers`, backend-offline/empty cases, and the full no-leak timing matrix remain unexercised. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
