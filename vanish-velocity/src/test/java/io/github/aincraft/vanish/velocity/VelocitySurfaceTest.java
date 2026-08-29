@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.velocitypowered.api.command.SimpleCommand;
+import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.player.ServerPreConnectEvent;
 import com.velocitypowered.api.event.player.TabCompleteEvent;
 import com.velocitypowered.api.proxy.ConnectionRequestBuilder;
@@ -49,6 +50,43 @@ class VelocitySurfaceTest {
 
     masker.onStateChanged(Set.of());
     assertSame(vanishedEntry, entries.get(VANISHED));
+  }
+
+  @Test
+  void remaskingKeepsOriginalEntryWhenAnotherPluginReaddsTarget() {
+    Map<UUID, TabListEntry> entries = new HashMap<>();
+    TabListEntry original = entry();
+    entries.put(VANISHED, original);
+    TabList tabList = tabList(entries);
+    Player viewer = player(VIEWER, tabList, null);
+    ProxyServer proxy = proxyServer(List.of(viewer), List.of());
+    VanishTabMasker masker = new VanishTabMasker(proxy, Set.of(VANISHED), Set.of());
+
+    masker.reconcile(viewer);
+    TabListEntry replacement = entry();
+    entries.put(VANISHED, replacement);
+    masker.reconcile(viewer);
+    masker.onStateChanged(Set.of());
+
+    assertSame(original, entries.get(VANISHED));
+  }
+
+  @Test
+  void disconnectRemovesTargetFromEveryViewerRestorationMap() {
+    Map<UUID, TabListEntry> entries = new HashMap<>();
+    entries.put(VANISHED, entry());
+    TabList tabList = tabList(entries);
+    Player viewer = player(VIEWER, tabList, null);
+    Player disconnected = player(VANISHED, tabList(new HashMap<>()), null);
+    ProxyServer proxy = proxyServer(List.of(viewer), List.of());
+    VanishTabMasker masker = new VanishTabMasker(proxy, Set.of(VANISHED), Set.of());
+
+    masker.reconcile(viewer);
+    masker.onDisconnect(
+        new DisconnectEvent(disconnected, DisconnectEvent.LoginStatus.SUCCESSFUL_LOGIN));
+    masker.onStateChanged(Set.of());
+
+    assertFalse(entries.containsKey(VANISHED));
   }
 
   @Test

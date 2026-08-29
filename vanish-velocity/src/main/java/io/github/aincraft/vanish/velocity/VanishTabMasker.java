@@ -115,8 +115,15 @@ public final class VanishTabMasker {
 
   @Subscribe
   public void onDisconnect(DisconnectEvent event) {
+    UUID disconnectedId = event.getPlayer().getUniqueId();
     synchronized (stateLock) {
-      removedEntries.remove(event.getPlayer().getUniqueId());
+      for (var iterator = removedEntries.entrySet().iterator(); iterator.hasNext(); ) {
+        var viewerEntries = iterator.next();
+        viewerEntries.getValue().remove(disconnectedId);
+        if (viewerEntries.getValue().isEmpty()) {
+          iterator.remove();
+        }
+      }
     }
   }
   @Subscribe
@@ -182,9 +189,6 @@ public final class VanishTabMasker {
       var entry = iterator.next();
       UUID targetId = entry.getKey();
       if (currentVanished.contains(targetId)) {
-        if (tabList.containsEntry(targetId)) {
-          iterator.remove();
-        }
         continue;
       }
       if (!tabList.containsEntry(targetId)) {

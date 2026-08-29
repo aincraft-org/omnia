@@ -92,11 +92,13 @@ public final class VanishVelocityPlugin {
                   VanishState initial = service.snapshot();
                   Set<UUID> initialVanished =
                       initial == null ? Set.of() : initial.vanished();
-                  VanishTabMasker masker = new VanishTabMasker(proxy, initialVanished, Set.of());
+                  Set<UUID> configuredSeeUuids = loaded.config().configuredSeeUuids();
+                  VanishTabMasker masker =
+                      new VanishTabMasker(proxy, initialVanished, configuredSeeUuids);
                   VanishServersCommand command =
-                      new VanishServersCommand(proxy, initialVanished, Set.of());
+                      new VanishServersCommand(proxy, initialVanished, configuredSeeUuids);
                   ServerConnectionGuard guard =
-                      new ServerConnectionGuard(initialVanished, Set.of());
+                      new ServerConnectionGuard(initialVanished, configuredSeeUuids);
                   Consumer<VanishState> listener =
                       state -> {
                         masker.onStateChanged(state.vanished());
