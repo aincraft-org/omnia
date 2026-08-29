@@ -236,3 +236,28 @@ No flicker/leak timing can be recorded. No FR-008 packet/NMS/ProtocolLib path wa
 - Destination visibility within one Paper tick: **BLOCKED**, no destination join was possible.
 - Default raw packet/NMS path: no new raw packet/NMS/ProtocolLib implementation was introduced by Task 8 wiring.
 - Full cross-backend smoke matrix: **BLOCKED** by the pre-existing required-port ownership and harness lobby-port limitation.
+
+## Current isolated alternate-port evidence
+
+The prior required-port `BLOCKED` result above is preserved. A separate task-owned runtime was then exercised under `/tmp/vanish-nopacket-live-20260829` without modifying or stopping the shared harness or user-owned services:
+
+- Proxy `28175`, lobby `38166`, alpha `38167`, beta `38168`, and Redis `16379`.
+- Java 25.0.2, Paper `26.2-119`, Velocity `4.1.1`, and Redis `7.4.11`.
+- Velocity was verified `online-mode=false`, `player-info-forwarding-mode="modern"`, and configured for the shared development secret. Each Paper server was separately verified `online-mode=false`, modern forwarding enabled with the same secret, BungeeCord forwarding disabled, and distinct `backend-id` values (`alpha`/`beta`).
+- The current `vanish-paper` shadow jar loaded on both Paper backends and the current `vanish-velocity` shadow jar loaded on Velocity. Alternate-port status handshakes reached all four Minecraft endpoints with protocol `776`.
+- A temporary local offline protocol client (Node `minecraft-protocol@1.68.0`, installed only under `/tmp`; no repository dependency) connected `Target` and `Observer` through Velocity. It routed Target and Observer to alpha, then Observer to beta, and later routed vanished Target to beta. This is real login/routing evidence, not a direct-backend-only check.
+- Observer received Target's `player_info` tab entry before vanish. After Target's `/vanish` acknowledgement and `alpha -> beta` move, Observer received Target's `player_info` add immediately followed by `player_remove`; unvanish later produced `player_info action=29` for Target on both clients. This proves observed tab-list masking/restoration packets, but does not prove an entity packet transition or a no-flicker/one-Paper-tick guarantee.
+- Redis showed one request subscriber and two event/response subscribers while the network was live. An owned Redis stop/restart produced subscriber reconnect logs and restored `PONG`/subscriber counts, but the ephemeral Redis snapshot key was not restored after an end-of-stream repair race; a subsequent `/vanish` request was rejected with `Redis snapshot key is missing`. Redis restart/resync is therefore **BLOCKED/NOT PASS**, not silently upgraded.
+
+Current isolated assessment:
+
+| Scenario | Current result |
+|---|---|
+| Alternate-port component startup, versions, forwarding preflight, and status reachability | PASS |
+| Local offline login through Velocity and `/server alpha`/`/server beta` routing | PASS for exercised transitions |
+| `/vanish` acknowledgement and observer tab packet masking/restoration | PASS at observed packet level |
+| Entity hiding, no-flicker timing, and one-Paper-tick destination guarantee | NOT PROVEN; the probe observed a Target tab add followed immediately by removal |
+| Redis restart and subscriber resync | BLOCKED/NOT PASS; subscribers returned but snapshot-key repair failed |
+| Proxy JSON reload, permission see exemption/revocation, `/vservers`, and full offline/empty-backend matrix | BLOCKED; not exercised |
+
+Detailed commands, logs, packet observations, client limitations, and cleanup proof are in `.superpowers/sdd/vanish-no-packet/live-runtime-report.md`. No FR-008, NMS, ProtocolLib, direct packet injection, permanent client dependency, or user-owned process change was introduced.
