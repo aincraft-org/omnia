@@ -14,11 +14,12 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /** Maintains authoritative vanish state and applies Paper-managed visibility changes. */
 public final class VanishManager {
-  private final JavaPlugin plugin;
+  private final Plugin plugin;
   private final Supplier<? extends Collection<? extends Player>> onlinePlayers;
   private final VersionedState state = new VersionedState();
   private final Map<VisibilityPair, Boolean> appliedVisibility = new HashMap<>();
@@ -27,9 +28,13 @@ public final class VanishManager {
   public VanishManager(JavaPlugin plugin) {
     this(plugin, () -> plugin.getServer().getOnlinePlayers());
   }
-
   public VanishManager(
       JavaPlugin plugin, Supplier<? extends Collection<? extends Player>> onlinePlayers) {
+    this((Plugin) plugin, onlinePlayers);
+  }
+
+  VanishManager(
+      Plugin plugin, Supplier<? extends Collection<? extends Player>> onlinePlayers) {
     this.plugin = Objects.requireNonNull(plugin, "plugin");
     this.onlinePlayers = Objects.requireNonNull(onlinePlayers, "onlinePlayers");
   }

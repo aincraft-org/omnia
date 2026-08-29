@@ -11,22 +11,31 @@ import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.bukkit.Server;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /** Handles vanish requests without changing local state before authority confirmation. */
 public final class VanishCommand implements TabExecutor {
-  private final JavaPlugin plugin;
+  private final Server server;
+  private final Plugin plugin;
   private final Supplier<? extends VanishTransport> transport;
 
   public VanishCommand(JavaPlugin plugin, VanishTransport transport) {
-    this(plugin, () -> transport);
+    this(plugin.getServer(), plugin, () -> transport);
   }
 
   public VanishCommand(JavaPlugin plugin, Supplier<? extends VanishTransport> transport) {
+    this(plugin.getServer(), plugin, transport);
+  }
+
+  VanishCommand(
+      Server server, Plugin plugin, Supplier<? extends VanishTransport> transport) {
+    this.server = server;
     this.plugin = plugin;
     this.transport = transport;
   }
@@ -60,7 +69,7 @@ public final class VanishCommand implements TabExecutor {
         return true;
       }
     } else {
-      target = plugin.getServer().getPlayerExact(args[0]);
+      target = server.getPlayerExact(args[0]);
       if (target == null) {
         send(sender, "No online player has that exact name.");
         return true;
@@ -89,7 +98,7 @@ public final class VanishCommand implements TabExecutor {
       suggestions.add("status");
     }
     if (sender.hasPermission(Permissions.OTHERS)) {
-      for (Player player : plugin.getServer().getOnlinePlayers()) {
+      for (Player player : server.getOnlinePlayers()) {
         if (player.getName().toLowerCase(Locale.ROOT).startsWith(prefix)) {
           suggestions.add(player.getName());
         }
@@ -224,7 +233,7 @@ public final class VanishCommand implements TabExecutor {
     if (org.bukkit.Bukkit.isPrimaryThread()) {
       send.run();
     } else {
-      plugin.getServer().getScheduler().runTask(plugin, send);
+      server.getScheduler().runTask(plugin, send);
     }
   }
 }
