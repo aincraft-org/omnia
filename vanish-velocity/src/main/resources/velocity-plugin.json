@@ -1,0 +1,8 @@
+{
+  "id": "vanish-nopacket",
+  "name": "VanishNoPacket",
+  "version": "${version}",
+  "description": "Cross-backend vanish without direct packet injection.",
+  "authors": ["aincraft"],
+  "main": "io.github.aincraft.vanish.velocity.VanishVelocityPlugin"
+}

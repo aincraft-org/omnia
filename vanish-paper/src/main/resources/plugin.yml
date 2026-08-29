@@ -1,0 +1,18 @@
+name: VanishNoPacket
+version: '${version}'
+main: io.github.aincraft.vanish.paper.VanishPaperPlugin
+api-version: '26.2'
+description: Cross-backend vanish without direct packet injection.
+permissions:
+  vanish.use:
+    description: Allows toggling your own vanish state.
+    default: op
+  vanish.others:
+    description: Allows toggling another player's vanish state.
+    default: op
+  vanish.see:
+    description: Allows seeing vanished players.
+    default: op
+  vanish.admin:
+    description: Allows administrative vanish operations.
+    default: op

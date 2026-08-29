@@ -1,0 +1,10 @@
+# Redis connection shared by the Paper backend and the Velocity authority.
+redis:
+  host: localhost
+  port: 6379
+  username: ""
+  password: ""
+  database: 0
+
+# Set a distinct value for every Paper backend connected to the proxy.
+backend-id: paper-local
