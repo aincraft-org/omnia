@@ -271,7 +271,7 @@ After the first live run, a regression test reproduced a transient Redis snapsho
 BUILD SUCCESSFUL
 ```
 
-The fixed Velocity shadow jar was rebuilt with SHA-256 `eeedea17581ec991d2a6cc84dc2a3c269cc0505c874dd094262876252d26ce66`. A task-owned rerun used proxy `28176`, lobby `38171`, alpha `38169`, beta `38170`, and Redis `16380`. The current jar was loaded by Velocity; Redis was stopped and started as a fresh ephemeral container. Before the restart, Redis returned:
+The fixed Velocity shadow jar used for the follow-up was SHA-256 `536614f9527aa57b75d06d685f99611998c15165889056eb2e18b4b360c1a05b`. A task-owned rerun used proxy `28176`, lobby `38171`, alpha `38169`, beta `38170`, and Redis `16380`. The current jar was loaded by Velocity; Redis was stopped and started as a fresh ephemeral container. Before the restart, Redis returned:
 
 ```text
 {"schema":1,"type":"vanish_state","version":3,"vanished":["db958d5e-bde2-36ef-8ccd-8577d5387953"]}
