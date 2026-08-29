@@ -13,6 +13,18 @@ plugins {
     id("io.github.development-network")
 }
 
+// The shared harness is adjacent to its composite `network` build.
+extra["devNetworkBin"] = "/home/jlo/dev/omnia/.agents/skills/development-network/bin"
+extra["networkJarTask"] = "shadowJar"
+
+tasks.named("runBackend") {
+    dependsOn("shadowJar")
+}
+
+tasks.named("runNetwork") {
+    dependsOn("shadowJar")
+}
+
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(25))
     withSourcesJar()

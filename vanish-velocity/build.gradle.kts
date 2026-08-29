@@ -1,5 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import org.gradle.language.jvm.tasks.ProcessResources
+import org.gradle.api.tasks.Copy
 
 
 plugins {
@@ -10,6 +10,23 @@ plugins {
     id("com.github.spotbugs") version "6.5.10"
     id("com.gradleup.shadow") version "9.6.1"
     id("io.github.development-network")
+}
+
+// The shared harness is adjacent to its composite `network` build.
+extra["devNetworkBin"] = "/home/jlo/dev/omnia/.agents/skills/development-network/bin"
+
+val deployVelocityProxyPlugin = tasks.register<Copy>("deployVelocityProxyPlugin") {
+    dependsOn("shadowJar")
+    from(tasks.named<ShadowJar>("shadowJar").flatMap { it.archiveFile })
+    into(
+        providers.gradleProperty("networkBase")
+            .map { "$it/runtime/plugins" }
+            .orElse("run/network/runtime/plugins"),
+    )
+}
+
+tasks.named("runProxy") {
+    dependsOn(deployVelocityProxyPlugin)
 }
 
 java {

@@ -36,8 +36,9 @@ Product jars deployed to the isolated runtime (one Paper jar per backend and one
 ```text
 /tmp/vanish-nopacket-task8/runtime/auto/alpha/plugins/vanish-paper-2026.08.29-SNAPSHOT.jar
 /tmp/vanish-nopacket-task8/runtime/auto/beta/plugins/vanish-paper-2026.08.29-SNAPSHOT.jar
-/tmp/vanish-nopacket-task8/proxy/plugins/vanish-velocity-2026.08.29-SNAPSHOT.jar
+/tmp/vanish-nopacket-task8/runtime/plugins/vanish-velocity-2026.08.29-SNAPSHOT.jar
 ```
+
 
 SHA-256:
 
@@ -45,14 +46,60 @@ SHA-256:
 vanish-paper-2026.08.29-SNAPSHOT.jar    6d8682820def04c9f339bea5a5b5ee06233b549a4f9c66a868daac5c2cd226e9
 vanish-velocity-2026.08.29-SNAPSHOT.jar 6df2e35b40de8c8dae830ca392f7d4c758cfaf65c5261b10199ee70c6cb4e31b
 ```
-
 ## Gradle wiring
 
 The standalone project was wired only to the existing composite:
 
 - `settings.gradle.kts` includes `/home/jlo/dev/omnia/.agents/skills/development-network/network`.
-- `vanish-paper/build.gradle.kts` applies `io.github.development-network`.
-- `vanish-velocity/build.gradle.kts` applies `io.github.development-network`.
+- `vanish-paper/build.gradle.kts` applies `io.github.development-network`, sets `extra["devNetworkBin"]` to the shared harness `bin` directory, sets `extra["networkJarTask"] = "shadowJar"`, and makes `runBackend`/`runNetwork` depend on `shadowJar`. This overrides the harness's thin-`jar` default for clean managed-backend runs.
+- `vanish-velocity/build.gradle.kts` applies `io.github.development-network`, sets `extra["devNetworkBin"]` to the shared harness `bin` directory, and adds `deployVelocityProxyPlugin`, which depends on `shadowJar` and copies the deployable artifact to `-PnetworkBase=<dir>/runtime/plugins`; `runProxy` depends on this task.
+
+Exact task-graph/deployment checks:
+
+```text
+./gradlew :vanish-paper:runBackend --dry-run :vanish-velocity:runProxy --dry-run -PnetworkBase=/tmp/vanish-nopacket-task8
+:vanish-paper:jar SKIPPED
+:vanish-paper:shadowJar SKIPPED
+:vanish-paper:runBackend SKIPPED
+:vanish-velocity:shadowJar SKIPPED
+:vanish-velocity:deployVelocityProxyPlugin SKIPPED
+:vanish-velocity:runProxy SKIPPED
+BUILD SUCCESSFUL
+
+./gradlew :vanish-velocity:deployVelocityProxyPlugin -PnetworkBase=/tmp/vanish-nopacket-task8
+BUILD SUCCESSFUL
+deployed=vanish-velocity-2026.08.29-SNAPSHOT.jar
+
+./gradlew :vanish-paper:shadowJar
+BUILD SUCCESSFUL
+alpha=vanish-paper-2026.08.29-SNAPSHOT.jar
+beta=vanish-paper-2026.08.29-SNAPSHOT.jar
+```
+
+Post-wiring Paper managed-task deployment gate (the network was intentionally not running):
+
+```text
+rm -f /tmp/vanish-nopacket-task8/runtime/auto/alpha/plugins/*.jar
+./gradlew :vanish-paper:runBackend -PnetworkBase=/tmp/vanish-nopacket-task8 -PnetworkBackend=alpha
+== runBackend: backend 'alpha' -> /tmp/vanish-nopacket-task8/runtime/auto/alpha (owner gradle-:vanish-paper:alpha-754-16390311531923)
+!! runBackend: cleanup exited with code 1
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':vanish-paper:runBackend' (registered by plugin 'io.github.development-network').
+> managed backend registration exited with code 1
+
+BUILD FAILED in 1s
+11 actionable tasks: 3 executed, 8 up-to-date
+```
+
+The expected registration failure occurred because no proxy controller was running; before that failure, `runBackend` deployed the configured shadow artifact:
+
+```text
+alpha=vanish-paper-2026.08.29-SNAPSHOT.jar
+6d8682820def04c9f339bea5a5b5ee06233b549a4f9c66a868daac5c2cd226e9  /tmp/vanish-nopacket-task8/runtime/auto/alpha/plugins/vanish-paper-2026.08.29-SNAPSHOT.jar
+```
 
 The absolute composite path is intentional for this workstation because the shared harness is outside the standalone project; the plugin also supports `DEV_NETWORK_BIN`/`DEV_NETWORK_DIR` for a portable checkout.
 
@@ -70,6 +117,49 @@ lobby/alpha/beta paper-global.yml proxies.velocity.online-mode=false
 lobby/alpha/beta paper-global.yml shared secret="dev-local-forwarding-secret-change-me"
 --- preflight checks ---
 PASS
+```
+
+Exact generator and verification commands (run in this order; no server process was started by either command):
+
+```bash
+BASE=/tmp/vanish-nopacket-task8 PROXY_PORT=25575 BACKENDS='alpha beta' \
+  PORT_ALPHA=30167 PORT_BETA=30168 PROXY_ONLINE_MODE=false \
+  bash -c '. /home/jlo/dev/omnia/.agents/skills/development-network/bin/velocity-toml.sh && write_velocity_toml'
+
+BASE=/tmp/vanish-nopacket-task8
+test "$(sed -n 's/^online-mode = //p' "$BASE/runtime/velocity.toml")" = false
+test "$(sed -n 's/^player-info-forwarding-mode = //p' "$BASE/runtime/velocity.toml")" = '"modern"'
+test "$(cat "$BASE/runtime/forwarding.secret")" = 'dev-local-forwarding-secret-change-me'
+for f in "$BASE/runtime/lobby/server.properties" \
+         "$BASE/runtime/auto/alpha/server.properties" \
+         "$BASE/runtime/auto/beta/server.properties"; do
+  test "$(sed -n 's/^online-mode=//p' "$f")" = false
+done
+for f in "$BASE/runtime/lobby/config/paper-global.yml" \
+         "$BASE/runtime/auto/alpha/config/paper-global.yml" \
+         "$BASE/runtime/auto/beta/config/paper-global.yml"; do
+  test "$(sed -n 's/^    online-mode: //p' "$f")" = false
+  test "$(sed -n 's/^    secret: //p' "$f")" = '"dev-local-forwarding-secret-change-me"'
+done
+echo PASS
+```
+
+Ordered timestamp evidence from the final pre-start gate:
+
+```text
+preflight_started_utc=2026-08-29T13:02:25Z
+velocity_config=2026-08-29 05:53:25.783827033 -0700 /tmp/vanish-nopacket-task8/runtime/velocity.toml
+forwarding_secret=2026-08-29 05:53:25.781940704 -0700 /tmp/vanish-nopacket-task8/runtime/forwarding.secret
+2026-08-29 05:53:25.556744140 -0700 /tmp/vanish-nopacket-task8/runtime/lobby/server.properties
+2026-08-29 05:53:25.557744150 -0700 /tmp/vanish-nopacket-task8/runtime/auto/alpha/server.properties
+2026-08-29 05:53:25.558806594 -0700 /tmp/vanish-nopacket-task8/runtime/auto/beta/server.properties
+2026-08-29 05:53:25.558806594 -0700 /tmp/vanish-nopacket-task8/runtime/lobby/config/paper-global.yml
+2026-08-29 05:53:25.557744150 -0700 /tmp/vanish-nopacket-task8/runtime/auto/alpha/config/paper-global.yml
+2026-08-29 05:53:25.558806594 -0700 /tmp/vanish-nopacket-task8/runtime/auto/beta/config/paper-global.yml
+preflight_result=PASS
+network_attempt_started_utc=2026-08-29T13:02:25Z
+network_attempt_exit=1
+network_attempt_finished_utc=2026-08-29T13:02:25Z
 ```
 
 Required-port evidence, collected before the attempt:
