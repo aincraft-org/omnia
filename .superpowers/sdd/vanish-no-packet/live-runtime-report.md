@@ -148,18 +148,18 @@ This initial pre-fix run observed Redis TCP/subscriber reconnect, but durable sn
 | Redis restart and subscriber resync | PASS in fixed follow-up; initial pre-fix run was not a pass |
 | Proxy restart and JSON reload | BLOCKED; not exercised as a client scenario |
 | Permission see exemption/revocation | BLOCKED; not exercised |
+| Backend-offline state change and startup reconciliation | PASS in fixed follow-up; beta was offline during Target's vanish, then rejoined before Target's hidden destination arrival |
 | `/vservers`/`/vanishservers` filtering | PASS in fixed follow-up; `/vservers` omitted the beta server containing only vanished Target |
 | Empty backend reconciliation and built-in `/server` guard | PASS in fixed follow-up; Observer entered empty beta while Target was vanished elsewhere, then `/vservers` omitted beta and `/server beta` returned `That server is unavailable.` |
-
+| Full no-leak timing matrix and separate entity hiding proof | NOT PROVEN; no correlated entity packet or one-Paper-tick/no-flicker capture |
 No FR-008 implementation or direct packet/NMS/ProtocolLib path was opened.
 
 ## Cleanup evidence
 
-Only task-owned names were stopped: `vanish-live-proxy`, `vanish-live-alpha`, `vanish-live-beta`, `vanish-live-lobby`, and `vanish-live-redis`. The temporary client had already exited normally. After cleanup:
+Only task-owned names were stopped: `vanish-live-proxy`, `vanish-live-alpha`, `vanish-live-beta`, `vanish-live-lobby`, `vanish-live-redis`, `vanish-velocity-rerun`, `vanish-alpha-rerun`, `vanish-beta-rerun`, `vanish-lobby-rerun`, and `vanish-redis-rerun`. The temporary clients exited normally. After the reconnect, empty-backend, and backend-offline follow-ups:
 
 ```text
-ss -ltn filtered for 28175,38166,38167,38168,16379: no output
-container filter vanish-live-redis-20260829: no output
+ss -ltn filtered for 28175,28176,38166,38167,38168,38169,38170,38171,16379,16380: no output
 ```
 
 No user-owned listener or service was stopped or modified.
@@ -212,4 +212,18 @@ Selected observations:
 3. Observer moved to empty lobby at `34.152s` and requested `/vservers` at `38.151s`; the proxy returned `Servers: alpha, lobby` at `38.155s`, omitting beta because it contained only the vanished Target.
 4. Observer requested `/server beta` at `42.151s`; Velocity returned `That server is unavailable.` at `42.152s`. After Target unvanished on beta at `46.151s`, both clients received `player_info action=29` at `46.160s`/`46.161s`; Observer's `/server beta` at `48.151s` then reached beta login at `48.221s` and received Target's tab entry at `48.222s`.
 
-The probe completed with `clients=2 firstLogins=2 events=70`. This adds direct evidence for empty-backend reconciliation, `/vservers` filtering, and the built-in server guard. Backend-offline transitions, permission exemption/revocation, proxy JSON reload, and no-leak timing remain unexercised. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
+
+The probe completed with `clients=2 firstLogins=2 events=70`. This adds direct evidence for empty-backend reconciliation, `/vservers` filtering, and the built-in server guard. The subsequent fixed follow-up covers backend-offline state change and restart reconciliation; permission exemption/revocation, proxy JSON reload, and no-leak timing remain unexercised. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
+
+## Fixed-artifact backend-offline follow-up
+
+A fourth task-owned run used proxy `28176`, lobby `38171`, alpha `38169`, beta `38170`, and Redis `16380` with the fixed artifacts. Beta was stopped at approximately probe time `14s`, after both clients reached alpha, and restarted after Target vanished at `18.150s` while beta was offline. The temporary client probe was `/tmp/vanish-nopacket-live-20260829/node-client/offline_backend_probe.js`; its output is `/tmp/vanish-nopacket-live-20260829/node-client/offline_backend_probe.log`.
+
+Selected observations:
+
+1. Target sent `/vanish` at `18.150s`; Observer received Target's `player_remove` at `18.165s` and the target received the vanished acknowledgement at `18.218s` while beta was offline.
+2. Beta restarted before the destination attempt. Target sent `/server beta` at `45.150s` and reached beta play login at `45.699s`; the target then received `player_remove` at `46.632s`, showing the restarted backend applied the vanished snapshot on arrival.
+3. Observer sent `/server beta` at `52.150s` while Target was the only vanished player there; Velocity returned `That server is unavailable.` at `52.154s`.
+4. Target unvanished at `57.151s`; both clients received `player_info action=29` at `57.162s`. Observer's `/server beta` at `60.150s` then reached beta play login at `60.262s` and received Target's tab entry.
+
+The probe completed with `clients=2 firstLogins=2 events=62`. This proves the backend-offline state-change/restart reconciliation path for the fixed artifact. It does not establish a no-flicker or one-Paper-tick guarantee, and it did not exercise permission revocation or proxy JSON reload.

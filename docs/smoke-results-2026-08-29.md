@@ -259,7 +259,8 @@ Current isolated assessment:
 | Entity hiding, no-flicker timing, and one-Paper-tick destination guarantee | NOT PROVEN; the probe observed a Target tab add followed immediately by removal |
 | Redis restart and subscriber resync | PASS in fixed follow-up; the initial run's ephemeral-key repair failure is retained in the detailed report |
 | Empty backend reconciliation, `/vservers` filtering, and built-in `/server` guard | PASS in fixed follow-up; empty beta admitted Observer, `/vservers` returned `Servers: alpha, lobby`, and `/server beta` was unavailable while beta contained only vanished Target |
-| Proxy JSON reload, permission see exemption/revocation, and full backend-offline matrix | BLOCKED; not exercised |
+| Backend-offline state change and restart reconciliation | PASS in fixed follow-up; beta was offline during Target's vanish, restarted before Target's destination arrival, and applied the hidden state |
+| Proxy JSON reload and permission see exemption/revocation | BLOCKED; not exercised |
 
 Detailed commands, logs, packet observations, client limitations, and cleanup proof are in `.superpowers/sdd/vanish-no-packet/live-runtime-report.md`. No FR-008, NMS, ProtocolLib, direct packet injection, permanent client dependency, or user-owned process change was introduced.
 
@@ -282,4 +283,6 @@ After the restart and delayed repair retry, the same `GET vanish:state:snapshot`
 
 The fixed-artifact follow-up also ran `/tmp/vanish-nopacket-live-20260829/node-client/empty_backend_probe.js`. Target vanished on alpha, Observer entered empty beta, Target later moved to beta, and Observer moved to lobby. `/vservers` returned `Servers: alpha, lobby` while beta contained only vanished Target; Observer's `/server beta` returned `That server is unavailable.` until Target unvanished, after which Observer entered beta and received Target's tab entry. The probe completed with `clients=2 firstLogins=2 events=70`. This proves empty-backend reconciliation, server-list filtering, and the built-in destination guard for the fixed artifact.
 
-The earlier limitations remain: the live probes did not isolate entity spawn/destroy packets, did not exercise proxy JSON reload, see-permission exemption/revocation, or backend-offline transitions, and do not establish a no-flicker or one-Paper-tick guarantee. No FR-008 packet/NMS/ProtocolLib implementation was added.
+The fixed-artifact follow-up also ran `/tmp/vanish-nopacket-live-20260829/node-client/offline_backend_probe.js`. Beta was stopped while Target and Observer were on alpha, Target vanished while beta was offline, beta restarted, and Target later reached beta at `45.699s`. The target received `player_remove` at `46.632s`; Observer's `/server beta` returned `That server is unavailable.` at `52.154s` until Target unvanished, after which Observer reached beta at `60.262s` and received Target's tab entry. The probe completed with `clients=2 firstLogins=2 events=62`. This proves backend-offline state-change and startup reconciliation for the fixed artifact.
+
+The earlier limitations remain: the live probes did not isolate entity spawn/destroy packets, did not exercise proxy JSON reload or see-permission exemption/revocation, and do not establish a no-flicker or one-Paper-tick guarantee. No FR-008 packet/NMS/ProtocolLib implementation was added.
