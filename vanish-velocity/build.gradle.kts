@@ -17,8 +17,16 @@ java {
 }
 
 dependencies {
+    implementation("redis.clients:jedis:8.0.1")
+    implementation("com.google.code.gson:gson:2.14.0")
     compileOnly("com.velocitypowered:velocity-api:4.1.1")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.3")
     implementation(project(":vanish-common"))
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 checkstyle {
