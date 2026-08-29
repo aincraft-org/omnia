@@ -117,6 +117,7 @@ public final class VanishTabMasker {
   public void onDisconnect(DisconnectEvent event) {
     UUID disconnectedId = event.getPlayer().getUniqueId();
     synchronized (stateLock) {
+      removedEntries.remove(disconnectedId);
       for (var iterator = removedEntries.entrySet().iterator(); iterator.hasNext(); ) {
         var viewerEntries = iterator.next();
         viewerEntries.getValue().remove(disconnectedId);

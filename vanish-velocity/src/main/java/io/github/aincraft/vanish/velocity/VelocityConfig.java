@@ -193,6 +193,9 @@ public record VelocityConfig(
     if (normalized.isBlank()) {
       return Set.of();
     }
+    if (normalized.equalsIgnoreCase("false")) {
+      return Set.of();
+    }
     Set<UUID> result = new HashSet<>();
     for (String token : normalized.split("[,\\s]+")) {
       String candidate = token.trim();

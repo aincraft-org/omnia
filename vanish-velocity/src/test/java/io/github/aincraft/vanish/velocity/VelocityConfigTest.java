@@ -38,4 +38,11 @@ class VelocityConfigTest {
 
     assertEquals(Set.of(configured), VelocityConfig.from(tempDir).configuredSeeUuids());
   }
+
+  @Test
+  void shippedDefaultSeeUuidsFalseDisablesConfiguredExemptions() throws IOException {
+    Files.writeString(tempDir.resolve("config.yml"), "see-uuids: false\n");
+
+    assertEquals(Set.of(), VelocityConfig.from(tempDir).configuredSeeUuids());
+  }
 }

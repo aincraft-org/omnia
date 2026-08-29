@@ -34,6 +34,8 @@ class VelocitySurfaceTest {
       UUID.fromString("00000000-0000-0000-0000-000000000010");
   private static final UUID VANISHED =
       UUID.fromString("00000000-0000-0000-0000-000000000011");
+  private static final UUID OTHER =
+      UUID.fromString("00000000-0000-0000-0000-000000000012");
 
   @Test
   void tabMaskerRestoresTheSameEntryAfterUnvanish() {
@@ -87,6 +89,25 @@ class VelocitySurfaceTest {
     masker.onStateChanged(Set.of());
 
     assertFalse(entries.containsKey(VANISHED));
+  }
+
+  @Test
+  void disconnectRemovesDisconnectedViewerRestorationState() {
+    Map<UUID, TabListEntry> entries = new HashMap<>();
+    entries.put(VANISHED, entry());
+    entries.put(OTHER, entry());
+    TabList tabList = tabList(entries);
+    Player viewer = player(VIEWER, tabList, null);
+    ProxyServer proxy = proxyServer(List.of(viewer), List.of());
+    VanishTabMasker masker = new VanishTabMasker(proxy, Set.of(VANISHED, OTHER), Set.of());
+
+    masker.reconcile(viewer);
+    masker.onDisconnect(
+        new DisconnectEvent(viewer, DisconnectEvent.LoginStatus.SUCCESSFUL_LOGIN));
+    masker.onStateChanged(Set.of());
+
+    assertFalse(entries.containsKey(VANISHED));
+    assertFalse(entries.containsKey(OTHER));
   }
 
   @Test
