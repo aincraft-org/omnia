@@ -147,7 +147,7 @@ This initial pre-fix run observed Redis TCP/subscriber reconnect, but durable sn
 | Unvanish restoration | PASS at tab-packet level; `player_info action=29` observed by both clients |
 | Redis restart and subscriber resync | PASS in fixed follow-up; initial pre-fix run was not a pass |
 | Proxy restart and JSON reload | PASS in fixed follow-up; `vanish-state.json` retained the vanished UUID and a restarted proxy masked it for newly connected clients |
-| Permission see exemption/revocation | BLOCKED; not exercised |
+| Permission see exemption/revocation | PASS in fixed follow-up; configured Observer was allowed to see/enter hidden beta, then config removal plus proxy restart restored masking and denial |
 | Backend-offline state change and startup reconciliation | PASS in fixed follow-up; beta was offline during Target's vanish, then rejoined before Target's hidden destination arrival |
 | `/vservers`/`/vanishservers` filtering | PASS in fixed follow-up; `/vservers` omitted the beta server containing only vanished Target |
 | Empty backend reconciliation and built-in `/server` guard | PASS in fixed follow-up; Observer entered empty beta while Target was vanished elsewhere, then `/vservers` omitted beta and `/server beta` returned `That server is unavailable.` |
@@ -243,4 +243,15 @@ Selected observations from the delayed probe:
 1. Target reconnected after the proxy restart at `0.182s`, received a `player_remove` for its own UUID at `0.931s`, and reached beta at `4.282s`; the restarted proxy therefore loaded the persisted vanished state before the new session's destination transition.
 2. Observer reconnected at `10.256s`, reached alpha at `14.317s`, and requested `/server beta` at `20.152s`; Velocity returned `That server is unavailable.` at `20.154s` while the vanished Target was the only beta occupant.
 
-The probe completed with `clients=2 firstLogins=2 events=29`. This proves proxy restart/state-file reload and post-restart destination guarding for the fixed artifact. Permission see exemption/revocation, no-leak timing, and separate entity-packet attribution remain unexercised.
+The probe completed with `clients=2 firstLogins=2 events=29`. This proves proxy restart/state-file reload and post-restart destination guarding for the fixed artifact. No-leak timing and separate entity-packet attribution remain unexercised.
+
+## Fixed-artifact see exemption and revocation follow-up
+
+A sixth task-owned run used the same fixed artifacts and ports with `see-uuids` configured to Observer's UUID (`11f4f517-853c-3cf3-a01b-95809db70061`). Both Target and Observer were operator-level on Paper, so the Paper `vanish.see` permission and the Velocity configured exemption were active.
+
+Selected observations from `/tmp/vanish-nopacket-live-20260829/node-client/see_permission_probe.log`:
+
+1. Target vanished at `18.150s`. Target moved to beta at `25.150s`; Observer received the normal alpha departure at `25.297s`, then entered beta at `32.234s` and received Target's `player_info action=255` entry at `32.235s` without a follow-up mask removal. `/vservers` at `39.150s` returned `Servers: alpha, beta, lobby`. This proves the configured see viewer can observe and enter a destination containing only a vanished player.
+2. The proxy was stopped, `see-uuids` was changed to `false`, and Velocity restarted with the same persisted state. The delayed revoked-viewer probe `/tmp/vanish-nopacket-live-20260829/node-client/late_reload_probe.log` reconnected Observer at `10.261s`; its `/server beta` at `20.154s` returned `That server is unavailable.` while Target remained vanished on beta. This proves revocation after configuration reload/restart.
+
+The see probe completed with `clients=2 firstLogins=2 events=49`; the revoked-viewer probe completed with `clients=2 firstLogins=2 events=27`. This covers configured Velocity see exemption and restart-based revocation. It does not claim a hot-reload API, because the plugin reads `see-uuids` at initialization.
