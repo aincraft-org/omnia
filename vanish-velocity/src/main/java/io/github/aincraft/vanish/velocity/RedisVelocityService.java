@@ -12,6 +12,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -19,6 +20,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import redis.clients.jedis.DefaultJedisClientConfig;
@@ -39,6 +41,8 @@ public final class RedisVelocityService implements AutoCloseable {
   private final boolean closeExecutors;
   private final AtomicBoolean closed = new AtomicBoolean();
   private final AtomicBoolean running = new AtomicBoolean();
+  private final CopyOnWriteArrayList<Consumer<VanishState>> stateListeners =
+      new CopyOnWriteArrayList<>();
   private volatile boolean redisAvailable;
 
   /** Creates the production Jedis-backed authority. */
@@ -96,6 +100,21 @@ public final class RedisVelocityService implements AutoCloseable {
     return store.hasValidSnapshot() ? store.snapshot() : null;
   }
 
+  /** Registers a listener for authoritative state changes and immediately supplies the current view. */
+  public void addStateListener(Consumer<VanishState> listener) {
+    Objects.requireNonNull(listener, "listener");
+    stateListeners.add(listener);
+    VanishState current = snapshot();
+    if (current != null) {
+      notifyListener(listener, current);
+    }
+  }
+
+  /** Stops delivery to a previously registered state listener. */
+  public void removeStateListener(Consumer<VanishState> listener) {
+    stateListeners.remove(listener);
+  }
+
   /** True when the store has a valid snapshot that may be published or served. */
   public boolean hasValidSnapshot() {
     return store.hasValidSnapshot();
@@ -136,6 +155,7 @@ public final class RedisVelocityService implements AutoCloseable {
             publishAcknowledgement(change.ack(), result);
             return;
           }
+          notifyStateListeners(change.snapshot());
           try {
             redis.set(VanishMessages.SNAPSHOT_KEY, VanishMessages.encode(change.snapshot()));
             redis.publish(VanishMessages.EVENTS_CHANNEL, VanishMessages.encode(change.delta()));
@@ -272,6 +292,7 @@ public final class RedisVelocityService implements AutoCloseable {
     }
     running.set(false);
     redisAvailable = false;
+    stateListeners.clear();
     try {
       redis.close();
     } catch (RuntimeException failure) {
@@ -310,6 +331,20 @@ public final class RedisVelocityService implements AutoCloseable {
         result);
     return result;
   }
+  private void notifyStateListeners(VanishState state) {
+    for (Consumer<VanishState> listener : stateListeners) {
+      notifyListener(listener, state);
+    }
+  }
+
+  private void notifyListener(Consumer<VanishState> listener, VanishState state) {
+    try {
+      listener.accept(state);
+    } catch (RuntimeException failure) {
+      logger.log(Level.WARNING, "Vanish state listener failed", failure);
+    }
+  }
+
 
   private void enqueue(Runnable operation, CompletableFuture<?> result) {
     try {

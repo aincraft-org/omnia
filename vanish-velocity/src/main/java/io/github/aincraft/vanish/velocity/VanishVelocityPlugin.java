@@ -6,15 +6,20 @@ import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
+import com.velocitypowered.api.proxy.ProxyServer;
+import io.github.aincraft.vanish.common.VanishState;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -23,17 +28,28 @@ import java.util.logging.Logger;
 public final class VanishVelocityPlugin {
   private final Path dataDirectory;
   private final Logger logger;
+  private final ProxyServer proxy;
   private final ExecutorService initializationExecutor;
   private final AtomicBoolean closed = new AtomicBoolean();
   private volatile RedisVelocityService redisService;
+  private volatile VanishTabMasker tabMasker;
+  private volatile VanishServersCommand serversCommand;
+  private volatile ServerConnectionGuard connectionGuard;
+  private volatile Consumer<VanishState> stateListener;
   private final Object lifecycleLock = new Object();
 
   @Inject
-  public VanishVelocityPlugin(@DataDirectory Path dataDirectory, Logger logger) {
+  public VanishVelocityPlugin(
+      @DataDirectory Path dataDirectory, Logger logger, ProxyServer proxy) {
     this.dataDirectory = dataDirectory;
     this.logger = logger;
+    this.proxy = proxy;
     this.initializationExecutor =
         Executors.newSingleThreadExecutor(namedFactory("vanish-velocity-init"));
+  }
+
+  VanishVelocityPlugin(Path dataDirectory, Logger logger) {
+    this(dataDirectory, logger, null);
   }
 
   @Subscribe
@@ -72,6 +88,40 @@ public final class VanishVelocityPlugin {
                 }
                 RedisVelocityService service =
                     new RedisVelocityService(loaded.store(), loaded.config(), logger);
+                if (proxy != null) {
+                  VanishState initial = service.snapshot();
+                  Set<UUID> initialVanished =
+                      initial == null ? Set.of() : initial.vanished();
+                  VanishTabMasker masker = new VanishTabMasker(proxy, initialVanished, Set.of());
+                  VanishServersCommand command =
+                      new VanishServersCommand(proxy, initialVanished, Set.of());
+                  ServerConnectionGuard guard =
+                      new ServerConnectionGuard(initialVanished, Set.of());
+                  Consumer<VanishState> listener =
+                      state -> {
+                        masker.onStateChanged(state.vanished());
+                        command.onStateChanged(state.vanished());
+                        guard.onStateChanged(state.vanished());
+                      };
+                  tabMasker = masker;
+                  serversCommand = command;
+                  connectionGuard = guard;
+                  stateListener = listener;
+                  service.addStateListener(listener);
+                  proxy.getEventManager().register(this, masker);
+                  proxy.getEventManager().register(this, guard);
+                  proxy
+                      .getCommandManager()
+                      .register(
+                          proxy
+                              .getCommandManager()
+                              .metaBuilder("vservers")
+                              .aliases("vanishservers")
+                              .plugin(this)
+                              .build(),
+                          command);
+                  masker.start(this);
+                }
                 redisService = service;
                 service.start();
               }
@@ -90,6 +140,18 @@ public final class VanishVelocityPlugin {
       }
       RedisVelocityService service = redisService;
       redisService = null;
+      Consumer<VanishState> listener = stateListener;
+      stateListener = null;
+      if (service != null && listener != null) {
+        service.removeStateListener(listener);
+      }
+      VanishTabMasker masker = tabMasker;
+      tabMasker = null;
+      serversCommand = null;
+      connectionGuard = null;
+      if (masker != null) {
+        masker.close();
+      }
       if (service != null) {
         service.close();
       }
