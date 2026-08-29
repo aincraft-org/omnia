@@ -8,21 +8,21 @@ import java.util.UUID;
 /** Maintains an immutable view of state while enforcing contiguous versions. */
 public final class VersionedState {
   private VanishState state = new VanishState(0, Set.of());
-  private boolean ready;
-  private boolean needsSnapshot;
+  private boolean snapshotReady;
+  private boolean snapshotNeeded;
 
   /** Replaces the state and marks this store ready to consume deltas. */
   public synchronized void applySnapshot(VanishState snapshot) {
     state = Objects.requireNonNull(snapshot, "snapshot");
-    ready = true;
-    needsSnapshot = false;
+    snapshotReady = true;
+    snapshotNeeded = false;
   }
 
   /** Applies a contiguous delta, or records that a snapshot is needed for a gap. */
   public synchronized boolean applyDelta(StateDelta delta) {
     Objects.requireNonNull(delta, "delta");
-    if (!ready) {
-      needsSnapshot = true;
+    if (!snapshotReady) {
+      snapshotNeeded = true;
       return false;
     }
 
@@ -31,10 +31,9 @@ public final class VersionedState {
       return false;
     }
     if (delta.version() != currentVersion + 1) {
-      needsSnapshot = true;
+      snapshotNeeded = true;
       return false;
     }
-
     Set<UUID> updated = new LinkedHashSet<>(state.vanished());
     if (delta.vanished()) {
       updated.add(delta.playerId());
@@ -42,7 +41,7 @@ public final class VersionedState {
       updated.remove(delta.playerId());
     }
     state = new VanishState(delta.version(), updated);
-    needsSnapshot = false;
+    snapshotNeeded = false;
     return true;
   }
 
@@ -51,19 +50,23 @@ public final class VersionedState {
     return state;
   }
 
+  /** Returns the current state version. */
   public synchronized long version() {
     return state.version();
   }
 
+  /** Returns the immutable set of vanished player IDs. */
   public synchronized Set<UUID> vanished() {
     return state.vanished();
   }
 
+  /** Returns whether a valid snapshot has been applied. */
   public synchronized boolean ready() {
-    return ready;
+    return snapshotReady;
   }
 
+  /** Returns whether a full snapshot is needed before applying deltas. */
   public synchronized boolean needsSnapshot() {
-    return needsSnapshot;
+    return snapshotNeeded;
   }
 }

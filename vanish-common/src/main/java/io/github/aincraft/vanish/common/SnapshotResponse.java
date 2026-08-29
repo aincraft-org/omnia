@@ -5,6 +5,7 @@ import java.util.UUID;
 
 /** A response containing the authoritative vanish snapshot for a backend. */
 public record SnapshotResponse(UUID requestId, String backendId, VanishState state) {
+  /** Validates identifiers and the returned snapshot. */
   public SnapshotResponse {
     Objects.requireNonNull(requestId, "requestId");
     Objects.requireNonNull(backendId, "backendId");

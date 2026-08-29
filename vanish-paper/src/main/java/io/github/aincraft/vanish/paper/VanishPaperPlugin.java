@@ -5,6 +5,7 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /** Paper entrypoint for the vanish backend. */
+@SuppressWarnings("PMD.NullAssignment")
 public final class VanishPaperPlugin extends JavaPlugin {
   private VanishManager manager;
   private PlayerListener listener;

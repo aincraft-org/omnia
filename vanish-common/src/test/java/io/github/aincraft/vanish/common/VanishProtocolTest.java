@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -14,6 +15,7 @@ class VanishProtocolTest {
   private static final UUID REQUEST = UUID.fromString("fedcba98-7654-3210-fedc-ba9876543210");
   private static final UUID FIRST = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final UUID LAST = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+  private static final String BACKEND = "backend-a";
 
   @Test
   void snapshotsEncodeDeterministicallyAndSortUuidStrings() {
@@ -41,11 +43,12 @@ class VanishProtocolTest {
     VanishState state = new VanishState(5, Set.of(PLAYER));
     ChangeRequest changeRequest = new ChangeRequest(REQUEST, PLAYER, true);
     StateDelta stateDelta = new StateDelta(6, PLAYER, true);
-    SnapshotRequest snapshotRequest = new SnapshotRequest(REQUEST, "backend-a");
-    SnapshotResponse snapshotResponse = new SnapshotResponse(REQUEST, "backend-a", state);
-    ChangeAck changeAck = new ChangeAck(REQUEST, true, 6, "");
+    SnapshotRequest snapshotRequest = new SnapshotRequest(REQUEST, BACKEND);
+    final SnapshotResponse snapshotResponse = new SnapshotResponse(REQUEST, BACKEND, state);
+    final ChangeAck changeAck = new ChangeAck(REQUEST, true, 6, "");
 
-    assertEquals(changeRequest, VanishMessages.decodeChangeRequest(VanishMessages.encode(changeRequest)));
+    assertEquals(
+        changeRequest, VanishMessages.decodeChangeRequest(VanishMessages.encode(changeRequest)));
     assertEquals(stateDelta, VanishMessages.decodeStateDelta(VanishMessages.encode(stateDelta)));
     assertEquals(
         snapshotRequest,
@@ -58,7 +61,7 @@ class VanishProtocolTest {
 
   @Test
   void protocolMessagesCarrySchemaAndTypeTags() {
-    String json = VanishMessages.encode(new SnapshotRequest(REQUEST, "backend-a"));
+    String json = VanishMessages.encode(new SnapshotRequest(REQUEST, BACKEND));
 
     assertTrue(json.startsWith("{\"schema\":1,\"type\":\"snapshot_request\""));
   }
@@ -72,9 +75,7 @@ class VanishProtocolTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> VanishMessages.decodeStateDelta("{\"schema\":1,\"type\":\"other\"}"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> VanishMessages.decodeStateDelta("[]"));
+    assertThrows(IllegalArgumentException.class, () -> VanishMessages.decodeStateDelta("[]"));
   }
 
   @Test
@@ -94,10 +95,11 @@ class VanishProtocolTest {
     assertThrows(NullPointerException.class, () -> new ChangeRequest(null, PLAYER, true));
     assertThrows(NullPointerException.class, () -> new ChangeRequest(REQUEST, null, true));
     assertThrows(NullPointerException.class, () -> new StateDelta(1, null, true));
-    assertThrows(NullPointerException.class, () -> new SnapshotRequest(null, "backend-a"));
-    assertThrows(NullPointerException.class, () -> new SnapshotRequest(REQUEST, null));
-    assertThrows(NullPointerException.class, () -> new SnapshotResponse(null, "backend-a", new VanishState(0, Set.of())));
-    assertThrows(NullPointerException.class, () -> new SnapshotResponse(REQUEST, "backend-a", null));
+    assertThrows(NullPointerException.class, () -> new SnapshotRequest(null, BACKEND));
+    assertThrows(
+        NullPointerException.class,
+        () -> new SnapshotResponse(null, BACKEND, new VanishState(0, Set.of())));
+    assertThrows(NullPointerException.class, () -> new SnapshotResponse(REQUEST, BACKEND, null));
     assertThrows(NullPointerException.class, () -> new ChangeAck(null, true, 1, ""));
     assertThrows(NullPointerException.class, () -> new ChangeAck(REQUEST, true, 1, null));
   }

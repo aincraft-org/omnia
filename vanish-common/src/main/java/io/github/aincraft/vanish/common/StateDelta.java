@@ -5,6 +5,7 @@ import java.util.UUID;
 
 /** A one-version change to one player's vanish state. */
 public record StateDelta(long version, UUID playerId, boolean vanished) {
+  /** Validates the target identifier. */
   public StateDelta {
     Objects.requireNonNull(playerId, "playerId");
   }

@@ -64,6 +64,7 @@ pmd {
 spotbugs {
     toolVersion.set("4.9.7")
     ignoreFailures.set(false)
+    excludeFilter.set(rootProject.file("config/spotbugs-exclude.xml"))
 }
 
 spotless {

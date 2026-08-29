@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /** Public replacement command for server listing and routing without hidden destinations. */
+@SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
 public final class VanishServersCommand implements SimpleCommand {
   private static final Comparator<RegisteredServer> BY_NAME =
       Comparator.comparing(
@@ -33,8 +34,7 @@ public final class VanishServersCommand implements SimpleCommand {
     this(proxy, Set.of(), configuredSeeUuids);
   }
 
-  public VanishServersCommand(
-      ProxyServer proxy, Set<UUID> vanished, Set<UUID> configuredSeeUuids) {
+  public VanishServersCommand(ProxyServer proxy, Set<UUID> vanished, Set<UUID> configuredSeeUuids) {
     this.proxy = Objects.requireNonNull(proxy, "proxy");
     this.vanished = immutableUuids(vanished, "vanished");
     this.configuredSeeUuids = immutableUuids(configuredSeeUuids, "configuredSeeUuids");
@@ -44,6 +44,7 @@ public final class VanishServersCommand implements SimpleCommand {
   public void onStateChanged(Set<UUID> vanished) {
     this.vanished = immutableUuids(vanished, "vanished");
   }
+
   /** Replaces configured viewers used by future list, route, and suggestion operations. */
   public void onConfiguredSeeUuidsChanged(Set<UUID> configuredSeeUuids) {
     this.configuredSeeUuids = immutableUuids(configuredSeeUuids, "configuredSeeUuids");
@@ -122,6 +123,7 @@ public final class VanishServersCommand implements SimpleCommand {
   private boolean canSee(CommandSource source) {
     return !(source instanceof Player player) || canSee(player);
   }
+
   private static String formatServerList(Collection<RegisteredServer> servers) {
     if (servers.isEmpty()) {
       return "Servers: none";

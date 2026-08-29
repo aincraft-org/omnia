@@ -216,7 +216,6 @@ public record VelocityConfig(
     return Set.copyOf(result);
   }
 
-
   private static int integer(Map<String, String> values, String key, int fallback) {
     return values.containsKey(key) ? Integer.parseInt(values.get(key)) : fallback;
   }

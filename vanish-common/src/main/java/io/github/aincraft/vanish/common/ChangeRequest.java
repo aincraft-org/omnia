@@ -5,6 +5,7 @@ import java.util.UUID;
 
 /** A request to change one player's vanish state. */
 public record ChangeRequest(UUID requestId, UUID playerId, boolean vanished) {
+  /** Validates request identifiers. */
   public ChangeRequest {
     Objects.requireNonNull(requestId, "requestId");
     Objects.requireNonNull(playerId, "playerId");

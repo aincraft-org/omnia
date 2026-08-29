@@ -25,6 +25,11 @@ import java.util.logging.Logger;
 
 /** Velocity entrypoint for the vanish proxy. */
 @Plugin(id = "vanish-nopacket")
+@SuppressWarnings({
+  "PMD.AvoidFieldNameMatchingMethodName",
+  "PMD.CloseResource",
+  "PMD.NullAssignment"
+})
 public final class VanishVelocityPlugin {
   private final Path dataDirectory;
   private final Logger logger;
@@ -39,8 +44,7 @@ public final class VanishVelocityPlugin {
   private final Object lifecycleLock = new Object();
 
   @Inject
-  public VanishVelocityPlugin(
-      @DataDirectory Path dataDirectory, Logger logger, ProxyServer proxy) {
+  public VanishVelocityPlugin(@DataDirectory Path dataDirectory, Logger logger, ProxyServer proxy) {
     this.dataDirectory = dataDirectory;
     this.logger = logger;
     this.proxy = proxy;
@@ -62,7 +66,8 @@ public final class VanishVelocityPlugin {
               try {
                 Files.createDirectories(dataDirectory);
               } catch (IOException failure) {
-                throw new IllegalStateException("Unable to create Velocity data directory", failure);
+                throw new IllegalStateException(
+                    "Unable to create Velocity data directory", failure);
               }
               VelocityConfig config;
               try {
@@ -90,8 +95,7 @@ public final class VanishVelocityPlugin {
                     new RedisVelocityService(loaded.store(), loaded.config(), logger);
                 if (proxy != null) {
                   VanishState initial = service.snapshot();
-                  Set<UUID> initialVanished =
-                      initial == null ? Set.of() : initial.vanished();
+                  Set<UUID> initialVanished = initial == null ? Set.of() : initial.vanished();
                   Set<UUID> configuredSeeUuids = loaded.config().configuredSeeUuids();
                   VanishTabMasker masker =
                       new VanishTabMasker(proxy, initialVanished, configuredSeeUuids);
@@ -134,6 +138,7 @@ public final class VanishVelocityPlugin {
               return null;
             });
   }
+
   @Subscribe
   public void onProxyShutdown(ProxyShutdownEvent event) {
     synchronized (lifecycleLock) {
@@ -178,7 +183,6 @@ public final class VanishVelocityPlugin {
       return state.backupFile();
     }
   }
-
 
   private static ThreadFactory namedFactory(String prefix) {
     AtomicInteger count = new AtomicInteger();

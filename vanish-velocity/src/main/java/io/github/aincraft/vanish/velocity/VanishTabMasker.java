@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Maintains per-viewer tab entries using only Velocity's public tab-list API. */
+@SuppressWarnings("PMD.NullAssignment")
 public final class VanishTabMasker {
   private static final int PERIODIC_BATCH_SIZE = 64;
   private static final Duration PERIOD = Duration.ofSeconds(1);
@@ -39,8 +40,7 @@ public final class VanishTabMasker {
     this(proxy, Set.of(), configuredSeeUuids);
   }
 
-  public VanishTabMasker(
-      ProxyServer proxy, Set<UUID> vanished, Set<UUID> configuredSeeUuids) {
+  public VanishTabMasker(ProxyServer proxy, Set<UUID> vanished, Set<UUID> configuredSeeUuids) {
     this.proxy = Objects.requireNonNull(proxy, "proxy");
     this.vanished = immutableUuids(vanished, "vanished");
     this.configuredSeeUuids = immutableUuids(configuredSeeUuids, "configuredSeeUuids");
@@ -66,6 +66,7 @@ public final class VanishTabMasker {
       reconcile(viewer);
     }
   }
+
   /** Replaces configured viewers and restores entries for viewers whose visibility changed. */
   public void onConfiguredSeeUuidsChanged(Set<UUID> configuredSeeUuids) {
     this.configuredSeeUuids = immutableUuids(configuredSeeUuids, "configuredSeeUuids");
@@ -100,6 +101,7 @@ public final class VanishTabMasker {
       removedEntries.clear();
     }
   }
+
   @Subscribe
   public void onPostLogin(PostLoginEvent event) {
     synchronized (stateLock) {
@@ -127,6 +129,7 @@ public final class VanishTabMasker {
       }
     }
   }
+
   @Subscribe
   public void onTabComplete(TabCompleteEvent event) {
     Player viewer = event.getPlayer();
@@ -135,9 +138,7 @@ public final class VanishTabMasker {
       return;
     }
     Set<UUID> currentVanished = vanished;
-    event
-        .getSuggestions()
-        .removeIf(suggestion -> isHiddenDestination(suggestion, currentVanished));
+    event.getSuggestions().removeIf(suggestion -> isHiddenDestination(suggestion, currentVanished));
   }
 
   private void reconcileBounded() {

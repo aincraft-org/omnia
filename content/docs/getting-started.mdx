@@ -1,0 +1,78 @@
+---
+title: Getting started
+description: Install the proxy and backend jars with shared Redis
+---
+
+# Getting started
+
+## Basics: required topology
+
+You need one Velocity proxy, one or more Paper backends, and one Redis instance:
+
+- Install `vanish-velocity-<version>.jar` in the Velocity `plugins/` directory.
+- Install `vanish-paper-<version>.jar` in `plugins/` on **every** backend.
+- Configure the same Redis endpoint, credentials, and database for Velocity and every Paper backend.
+- Set a different, non-blank `backend-id` on each Paper backend.
+- Make clients connect only to Velocity. Backend addresses are not supported client entry points for cross-backend enforcement.
+
+Build deployable artifacts with:
+
+```bash
+./gradlew :vanish-paper:shadowJar :vanish-velocity:shadowJar
+```
+
+Use the resulting `shadowJar` files, not the thin `jar` files.
+
+## Configure Paper
+
+Edit `plugins/VanishNoPacket/config.yml` on each backend:
+
+```yaml
+redis:
+  host: localhost
+  port: 6379
+  username: ""
+  password: ""
+  database: 0
+  connection-timeout-ms: 5000
+  socket-timeout-ms: 5000
+  blocking-socket-timeout-ms: 0
+  request-timeout-ms: 5000
+  retry-initial-ms: 500
+  retry-max-ms: 30000
+backend-id: alpha
+```
+
+Replace `alpha` with a unique ID such as `beta` on the next backend. Values ending in `-ms` are milliseconds.
+
+## Configure Velocity
+
+Edit `plugins/vanish-nopacket/config.yml`:
+
+```yaml
+redis:
+  host: localhost
+  port: 6379
+  username: ""
+  password: ""
+  database: 0
+connection-timeout-millis: 5000
+socket-timeout-millis: 5000
+blocking-socket-timeout-millis: 0
+retry-initial-millis: 500
+retry-max-millis: 30000
+state-file: vanish-state.json
+server-selection-masking: true
+player-list-masking: true
+see-uuids: false
+```
+
+The Velocity settings are flat keys. A relative `state-file` is resolved inside the plugin data directory. `see-uuids` can be a list of canonical UUIDs who may see vanished players and destinations; leave it empty or `false` for no configured exemptions.
+
+> **Practical warning:** keep Redis reachable from both the proxy and every backend. A backend-only Redis or a direct backend connection cannot provide cross-backend authority.
+
+## First run
+
+Restart Velocity and all Paper backends after installing and configuring the jars. On startup the proxy loads its durable state and publishes the snapshot. Each backend subscribes, reads or requests a full snapshot, and only then applies join visibility when it has a valid state.
+
+Try the [Everyday operations](./everyday.mdx) commands after players have joined through Velocity. If the state file is corrupt, the proxy intentionally disables mutations and publication; read [Advanced operations](./advanced.mdx) before changing it.

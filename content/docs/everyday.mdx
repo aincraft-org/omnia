@@ -1,0 +1,34 @@
+---
+title: Everyday operations
+description: Toggle vanish and move between visible destinations
+---
+
+# Everyday operations
+
+These commands operate on players connected through Velocity and the Paper backend where the command is run.
+
+## Toggle a player
+
+- `/vanish` toggles your own state (`vanish.use`).
+- `/vanish <exact-player-name>` toggles an online player. Use `vanish.use` for yourself or `vanish.others` for another player.
+- `/vanish status` shows the authoritative version and vanished UUIDs (`vanish.admin`).
+
+The command asks the authority for the current snapshot before submitting the desired state. A success message is sent only after the authority acknowledges the change, for example `<player> is now vanished.` or `<player> is now visible.` An unavailable Redis/authority or rejected request is reported instead of being treated as a local success.
+
+## Who can see vanished players?
+
+`vanish.see` is checked independently for each viewer on Paper. A viewer without it has the vanished target hidden through Paper's public visibility API. A viewer with it remains able to see the target. Permission changes are reconciled on a one-second Paper task, so a permission update converges without requiring a relog.
+
+Velocity also has optional `see-uuids` exemptions in its config. Those UUIDs can see vanished players in proxy tab masking and can list or route to destinations that contain only vanished players. Console commands are treated as able to see all destinations, but console cannot connect to a server.
+
+## List and switch destinations
+
+`/vservers` lists destinations visible to you. `/vservers <server>` requests a connection. `/vanishservers` is an alias.
+
+A destination is hidden only when every player connected to it is vanished. If at least one non-vanished player is present, it remains listed. Hidden destinations are unavailable to non-exempt players, including through the built-in `/server <name>` route. Suggestions for `/server`, `/vservers`, and `/vanishservers` are masked consistently.
+
+> **Practical warning:** use registered Velocity server names in these commands. A Paper `backend-id` identifies Redis reconciliation; it is not automatically a command destination name.
+
+## Moving between backends
+
+When a vanished player changes backend, the proxy keeps the authoritative state and the destination Paper backend reconciles it on join. Existing viewers reconcile when state changes, join, change world, and during the periodic maintenance pass. The dated smoke record reports these live scenarios as **BLOCKED**, so no timing or no-flicker claim is made from this repository's evidence.

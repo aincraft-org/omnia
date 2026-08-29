@@ -13,16 +13,19 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 /** Applies the current vanish state as players enter, leave, or change worlds. */
+@SuppressWarnings("PMD.NullAssignment")
 public final class PlayerListener implements Listener {
   private final Plugin plugin;
   private final VanishManager manager;
   private final RedisPaperService redis;
   private BukkitTask permissionTask;
 
+  /** Creates a listener without a Redis transport for local visibility use. */
   public PlayerListener(JavaPlugin plugin, VanishManager manager) {
     this((Plugin) plugin, manager, null);
   }
 
+  /** Creates a listener with Redis-backed state reconciliation. */
   public PlayerListener(JavaPlugin plugin, VanishManager manager, RedisPaperService redis) {
     this((Plugin) plugin, manager, redis);
   }
@@ -50,6 +53,7 @@ public final class PlayerListener implements Listener {
     }
   }
 
+  /** Keeps login closed when no valid authoritative state is available. */
   @EventHandler
   public void onPreLogin(AsyncPlayerPreLoginEvent event) {
     if (redis == null) {
@@ -72,6 +76,7 @@ public final class PlayerListener implements Listener {
             });
   }
 
+  /** Applies cached and freshly reconciled state when a player joins. */
   @EventHandler
   public void onJoin(PlayerJoinEvent event) {
     Player player = event.getPlayer();
@@ -88,8 +93,7 @@ public final class PlayerListener implements Listener {
         .reconcileForJoin()
         .whenComplete(
             (state, error) -> {
-              if (error == null
-                  && (!hadCachedState || state.version() > appliedVersion)) {
+              if (error == null && (!hadCachedState || state.version() > appliedVersion)) {
                 plugin
                     .getServer()
                     .getScheduler()
@@ -98,6 +102,7 @@ public final class PlayerListener implements Listener {
             });
   }
 
+  /** Reconciles viewer and target visibility after a world change. */
   @EventHandler
   public void onWorldChange(PlayerChangedWorldEvent event) {
     Player player = event.getPlayer();
@@ -105,6 +110,7 @@ public final class PlayerListener implements Listener {
     manager.reconcileTarget(player);
   }
 
+  /** Releases visibility bookkeeping when a player leaves. */
   @EventHandler
   public void onQuit(PlayerQuitEvent event) {
     UUID playerId = event.getPlayer().getUniqueId();

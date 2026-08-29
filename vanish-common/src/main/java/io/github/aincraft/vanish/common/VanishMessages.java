@@ -7,7 +7,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonPrimitive;
 import com.google.gson.Strictness;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
@@ -28,6 +27,12 @@ public final class VanishMessages {
   public static final int SCHEMA_VERSION = 1;
 
   private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
+  private static final String FIELD_REQUEST_ID = "requestId";
+  private static final String FIELD_PLAYER_ID = "playerId";
+  private static final String FIELD_VANISHED = "vanished";
+  private static final String FIELD_VERSION = "version";
+  private static final String FIELD_BACKEND_ID = "backendId";
+  private static final String FIELD_ERROR_PREFIX = "Field ";
 
   private VanishMessages() {}
 
@@ -38,63 +43,73 @@ public final class VanishMessages {
     }
     if (message instanceof ChangeRequest request) {
       JsonObject object = envelope("change_request");
-      object.addProperty("requestId", request.requestId().toString());
-      object.addProperty("playerId", request.playerId().toString());
-      object.addProperty("vanished", request.vanished());
+      object.addProperty(FIELD_REQUEST_ID, request.requestId().toString());
+      object.addProperty(FIELD_PLAYER_ID, request.playerId().toString());
+      object.addProperty(FIELD_VANISHED, request.vanished());
       return GSON.toJson(object);
     }
     if (message instanceof StateDelta delta) {
       JsonObject object = envelope("state_delta");
-      object.addProperty("version", delta.version());
-      object.addProperty("playerId", delta.playerId().toString());
-      object.addProperty("vanished", delta.vanished());
+      object.addProperty(FIELD_VERSION, delta.version());
+      object.addProperty(FIELD_PLAYER_ID, delta.playerId().toString());
+      object.addProperty(FIELD_VANISHED, delta.vanished());
       return GSON.toJson(object);
     }
     if (message instanceof SnapshotRequest request) {
       JsonObject object = envelope("snapshot_request");
-      object.addProperty("requestId", request.requestId().toString());
-      object.addProperty("backendId", request.backendId());
+      object.addProperty(FIELD_REQUEST_ID, request.requestId().toString());
+      object.addProperty(FIELD_BACKEND_ID, request.backendId());
       return GSON.toJson(object);
     }
     if (message instanceof SnapshotResponse response) {
       JsonObject object = envelope("snapshot_response");
-      object.addProperty("requestId", response.requestId().toString());
-      object.addProperty("backendId", response.backendId());
+      object.addProperty(FIELD_REQUEST_ID, response.requestId().toString());
+      object.addProperty(FIELD_BACKEND_ID, response.backendId());
       object.add("state", encodeStatePayload(response.state()));
       return GSON.toJson(object);
     }
     if (message instanceof ChangeAck ack) {
       JsonObject object = envelope("change_ack");
-      object.addProperty("requestId", ack.requestId().toString());
+      object.addProperty(FIELD_REQUEST_ID, ack.requestId().toString());
       object.addProperty("accepted", ack.accepted());
-      object.addProperty("version", ack.version());
+      object.addProperty(FIELD_VERSION, ack.version());
       object.addProperty("error", ack.error());
       return GSON.toJson(object);
     }
     throw new IllegalArgumentException("Unsupported vanish message: " + message);
   }
 
+  /** Decodes a full vanish-state envelope. */
   public static VanishState decodeVanishState(String json) {
     return decodeState(readEnvelope(json, "vanish_state"));
   }
 
+  /** Decodes a desired-state change request. */
   public static ChangeRequest decodeChangeRequest(String json) {
     JsonObject object = readEnvelope(json, "change_request");
     return new ChangeRequest(
-        readUuid(object, "requestId"), readUuid(object, "playerId"), readBoolean(object, "vanished"));
+        readUuid(object, FIELD_REQUEST_ID),
+        readUuid(object, FIELD_PLAYER_ID),
+        readBoolean(object, FIELD_VANISHED));
   }
 
+  /** Decodes one versioned state delta. */
   public static StateDelta decodeStateDelta(String json) {
     JsonObject object = readEnvelope(json, "state_delta");
     return new StateDelta(
-        readLong(object, "version"), readUuid(object, "playerId"), readBoolean(object, "vanished"));
+        readLong(object, FIELD_VERSION),
+        readUuid(object, FIELD_PLAYER_ID),
+        readBoolean(object, FIELD_VANISHED));
   }
 
+  /** Decodes a backend snapshot request. */
   public static SnapshotRequest decodeSnapshotRequest(String json) {
     JsonObject object = readEnvelope(json, "snapshot_request");
-    return new SnapshotRequest(readUuid(object, "requestId"), readString(object, "backendId"));
+    return new SnapshotRequest(
+        readUuid(object, FIELD_REQUEST_ID), readString(object, FIELD_BACKEND_ID));
   }
 
+  /** Decodes a full snapshot response. */
   public static SnapshotResponse decodeSnapshotResponse(String json) {
     JsonObject object = readEnvelope(json, "snapshot_response");
     JsonElement stateElement = required(object, "state");
@@ -102,31 +117,32 @@ public final class VanishMessages {
       throw new IllegalArgumentException("Field state must be an object");
     }
     return new SnapshotResponse(
-        readUuid(object, "requestId"),
-        readString(object, "backendId"),
+        readUuid(object, FIELD_REQUEST_ID),
+        readString(object, FIELD_BACKEND_ID),
         decodeStatePayload(stateElement.getAsJsonObject()));
   }
 
+  /** Decodes an acknowledgement of a state change. */
   public static ChangeAck decodeChangeAck(String json) {
     JsonObject object = readEnvelope(json, "change_ack");
     return new ChangeAck(
-        readUuid(object, "requestId"),
+        readUuid(object, FIELD_REQUEST_ID),
         readBoolean(object, "accepted"),
-        readLong(object, "version"),
+        readLong(object, FIELD_VERSION),
         readString(object, "error"));
   }
 
   private static JsonObject encodeStateEnvelope(VanishState state) {
     JsonObject object = envelope("vanish_state");
-    object.addProperty("version", state.version());
-    object.add("vanished", encodeUuidArray(state));
+    object.addProperty(FIELD_VERSION, state.version());
+    object.add(FIELD_VANISHED, encodeUuidArray(state));
     return object;
   }
 
   private static JsonObject encodeStatePayload(VanishState state) {
     JsonObject object = new JsonObject();
-    object.addProperty("version", state.version());
-    object.add("vanished", encodeUuidArray(state));
+    object.addProperty(FIELD_VERSION, state.version());
+    object.add(FIELD_VANISHED, encodeUuidArray(state));
     return object;
   }
 
@@ -166,15 +182,17 @@ public final class VanishMessages {
     if (json == null) {
       throw new IllegalArgumentException("JSON must not be null");
     }
-    try {
-      JsonReader reader = new JsonReader(new StringReader(json));
+    try (JsonReader reader = new JsonReader(new StringReader(json))) {
       reader.setStrictness(Strictness.STRICT);
       JsonElement element = JsonParser.parseReader(reader);
       if (reader.peek() != JsonToken.END_DOCUMENT) {
         throw new IllegalArgumentException("Trailing JSON content");
       }
       return element;
-    } catch (IOException | JsonParseException | IllegalStateException | NumberFormatException exception) {
+    } catch (IOException
+        | JsonParseException
+        | IllegalStateException
+        | NumberFormatException exception) {
       throw new IllegalArgumentException("Malformed JSON", exception);
     }
   }
@@ -184,9 +202,9 @@ public final class VanishMessages {
   }
 
   private static VanishState decodeStatePayload(JsonObject object) {
-    JsonElement arrayElement = required(object, "vanished");
+    JsonElement arrayElement = required(object, FIELD_VANISHED);
     if (!arrayElement.isJsonArray()) {
-      throw new IllegalArgumentException("Field vanished must be an array");
+      throw new IllegalArgumentException(FIELD_ERROR_PREFIX + FIELD_VANISHED + " must be an array");
     }
     List<UUID> vanished = new ArrayList<>();
     for (JsonElement element : arrayElement.getAsJsonArray()) {
@@ -195,7 +213,7 @@ public final class VanishMessages {
       }
       vanished.add(parseUuid(element.getAsString(), "vanished UUID"));
     }
-    return new VanishState(readLong(object, "version"), java.util.Set.copyOf(vanished));
+    return new VanishState(readLong(object, FIELD_VERSION), java.util.Set.copyOf(vanished));
   }
 
   private static JsonElement required(JsonObject object, String field) {
@@ -208,7 +226,7 @@ public final class VanishMessages {
   private static String readString(JsonObject object, String field) {
     JsonElement element = required(object, field);
     if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString()) {
-      throw new IllegalArgumentException("Field " + field + " must be a string");
+      throw new IllegalArgumentException(FIELD_ERROR_PREFIX + field + " must be a string");
     }
     return element.getAsString();
   }
@@ -216,7 +234,7 @@ public final class VanishMessages {
   private static boolean readBoolean(JsonObject object, String field) {
     JsonElement element = required(object, field);
     if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isBoolean()) {
-      throw new IllegalArgumentException("Field " + field + " must be a boolean");
+      throw new IllegalArgumentException(FIELD_ERROR_PREFIX + field + " must be a boolean");
     }
     return element.getAsBoolean();
   }
@@ -224,12 +242,13 @@ public final class VanishMessages {
   private static long readLong(JsonObject object, String field) {
     JsonElement element = required(object, field);
     if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isNumber()) {
-      throw new IllegalArgumentException("Field " + field + " must be an integer");
+      throw new IllegalArgumentException(FIELD_ERROR_PREFIX + field + " must be an integer");
     }
     try {
       return new BigDecimal(element.getAsString()).toBigIntegerExact().longValueExact();
     } catch (ArithmeticException | NumberFormatException exception) {
-      throw new IllegalArgumentException("Field " + field + " must be an integer", exception);
+      throw new IllegalArgumentException(
+          FIELD_ERROR_PREFIX + field + " must be an integer", exception);
     }
   }
 
@@ -241,14 +260,15 @@ public final class VanishMessages {
     try {
       UUID uuid = UUID.fromString(value);
       if (!uuid.toString().equals(value)) {
-        throw new IllegalArgumentException("Field " + field + " must use a canonical UUID");
+        throw new IllegalArgumentException(
+            FIELD_ERROR_PREFIX + field + " must use a canonical UUID");
       }
       return uuid;
     } catch (IllegalArgumentException exception) {
       if (exception.getMessage() != null && exception.getMessage().contains("canonical UUID")) {
         throw exception;
       }
-      throw new IllegalArgumentException("Field " + field + " must be a UUID", exception);
+      throw new IllegalArgumentException(FIELD_ERROR_PREFIX + field + " must be a UUID", exception);
     }
   }
 }

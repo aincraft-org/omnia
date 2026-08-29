@@ -24,6 +24,7 @@ import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("PMD.CloseResource")
 class RedisPaperServiceTest {
   private static final UUID TARGET = UUID.fromString("00000000-0000-0000-0000-000000000002");
   private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -113,7 +114,8 @@ class RedisPaperServiceTest {
 
     CompletionException failure =
         org.junit.jupiter.api.Assertions.assertThrows(
-            CompletionException.class, () -> service.reconcileForPreLogin().toCompletableFuture().join());
+            CompletionException.class,
+            () -> service.reconcileForPreLogin().toCompletableFuture().join());
 
     assertNotNull(failure.getCause());
     assertEquals(1, transport.snapshotRequests.size());
@@ -175,7 +177,8 @@ class RedisPaperServiceTest {
     transport.change = new CompletableFuture<>();
     CompletionException timeout =
         org.junit.jupiter.api.Assertions.assertThrows(
-            CompletionException.class, () -> service.requestChange(request).toCompletableFuture().join());
+            CompletionException.class,
+            () -> service.requestChange(request).toCompletableFuture().join());
     assertNotNull(timeout.getCause());
     assertFalse(manager.isVanished(TARGET));
   }
@@ -197,20 +200,19 @@ class RedisPaperServiceTest {
     assertFalse(manager.isVanished(TARGET));
   }
 
-
   @Test
   void closeCancelsPendingRequestsAndClosesInjectedTransport() {
     FakeTransport transport = new FakeTransport();
     RedisPaperService service = service(manager(), transport, Duration.ofSeconds(1));
     CompletionStage<ChangeAck> pending =
-        service.requestChange(
-            new ChangeRequest(UUID.randomUUID(), TARGET, true));
+        service.requestChange(new ChangeRequest(UUID.randomUUID(), TARGET, true));
 
     service.close();
 
     assertTrue(pending.toCompletableFuture().isCompletedExceptionally());
     assertTrue(transport.closed);
   }
+
   private RedisPaperService service(
       VanishManager manager, FakeTransport transport, Duration timeout) {
     return new RedisPaperService(manager, transport, scheduler, timeout, "test-backend");
@@ -228,7 +230,8 @@ class RedisPaperServiceTest {
     private CompletableFuture<ChangeAck> change = new CompletableFuture<>();
     private CompletableFuture<Void> snapshotRequestCompletion =
         CompletableFuture.completedFuture(null);
-    private final java.util.ArrayList<SnapshotRequest> snapshotRequests = new java.util.ArrayList<>();
+    private final java.util.ArrayList<SnapshotRequest> snapshotRequests =
+        new java.util.ArrayList<>();
     private boolean closed;
 
     @Override

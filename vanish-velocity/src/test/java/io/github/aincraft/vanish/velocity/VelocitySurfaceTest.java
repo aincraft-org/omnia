@@ -29,13 +29,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings({
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.AvoidFieldNameMatchingMethodName",
+  "PMD.UseProperClassLoader"
+})
 class VelocitySurfaceTest {
-  private static final UUID VIEWER =
-      UUID.fromString("00000000-0000-0000-0000-000000000010");
-  private static final UUID VANISHED =
-      UUID.fromString("00000000-0000-0000-0000-000000000011");
-  private static final UUID OTHER =
-      UUID.fromString("00000000-0000-0000-0000-000000000012");
+  private static final UUID VIEWER = UUID.fromString("00000000-0000-0000-0000-000000000010");
+  private static final UUID VANISHED = UUID.fromString("00000000-0000-0000-0000-000000000011");
+  private static final UUID OTHER = UUID.fromString("00000000-0000-0000-0000-000000000012");
 
   @Test
   void tabMaskerRestoresTheSameEntryAfterUnvanish() {
@@ -102,8 +104,7 @@ class VelocitySurfaceTest {
     VanishTabMasker masker = new VanishTabMasker(proxy, Set.of(VANISHED, OTHER), Set.of());
 
     masker.reconcile(viewer);
-    masker.onDisconnect(
-        new DisconnectEvent(viewer, DisconnectEvent.LoginStatus.SUCCESSFUL_LOGIN));
+    masker.onDisconnect(new DisconnectEvent(viewer, DisconnectEvent.LoginStatus.SUCCESSFUL_LOGIN));
     masker.onStateChanged(Set.of());
 
     assertFalse(entries.containsKey(VANISHED));
@@ -131,8 +132,7 @@ class VelocitySurfaceTest {
     RegisteredServer destination = registeredServer("hidden", List.of(hidden));
     AtomicReference<String> message = new AtomicReference<>();
     Player viewer = player(VIEWER, tabList(new HashMap<>()), message);
-    ServerConnectionGuard guard =
-        new ServerConnectionGuard(Set.of(VANISHED), Set.of());
+    ServerConnectionGuard guard = new ServerConnectionGuard(Set.of(VANISHED), Set.of());
 
     ServerPreConnectEvent deniedEvent = new ServerPreConnectEvent(viewer, destination);
     guard.onServerPreConnect(deniedEvent);
@@ -140,8 +140,7 @@ class VelocitySurfaceTest {
     assertFalse(deniedEvent.getResult().isAllowed());
     assertTrue(message.get().contains("unavailable"));
 
-    ServerConnectionGuard seeGuard =
-        new ServerConnectionGuard(Set.of(VANISHED), Set.of(VIEWER));
+    ServerConnectionGuard seeGuard = new ServerConnectionGuard(Set.of(VANISHED), Set.of(VIEWER));
     ServerPreConnectEvent allowedEvent = new ServerPreConnectEvent(viewer, destination);
     seeGuard.onServerPreConnect(allowedEvent);
 
@@ -156,8 +155,7 @@ class VelocitySurfaceTest {
     Player viewer = player(VIEWER, tabList(new HashMap<>()), null);
     ProxyServer proxy = proxyServer(List.of(viewer), List.of(hiddenServer, visibleServer));
     VanishTabMasker masker = new VanishTabMasker(proxy, Set.of(VANISHED), Set.of());
-    TabCompleteEvent event =
-        new TabCompleteEvent(viewer, "/server ", List.of("hidden", "visible"));
+    TabCompleteEvent event = new TabCompleteEvent(viewer, "/server ", List.of("hidden", "visible"));
 
     masker.onTabComplete(event);
 
@@ -206,8 +204,7 @@ class VelocitySurfaceTest {
 
   private static TabListEntry entry() {
     return proxy(
-        TabListEntry.class,
-        (ignored, method, arguments) -> defaultValue(method.getReturnType()));
+        TabListEntry.class, (ignored, method, arguments) -> defaultValue(method.getReturnType()));
   }
 
   private static Player player(UUID id, TabList tabList, AtomicReference<String> message) {
@@ -262,8 +259,7 @@ class VelocitySurfaceTest {
 
   @SuppressWarnings("unchecked")
   private static <T> T proxy(Class<T> type, InvocationHandler handler) {
-    return (T)
-        Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler);
+    return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler);
   }
 
   private static Object defaultValue(Class<?> type) {

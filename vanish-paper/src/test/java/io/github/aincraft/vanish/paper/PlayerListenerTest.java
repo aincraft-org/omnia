@@ -22,6 +22,7 @@ import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("PMD.CloseResource")
 class PlayerListenerTest {
   private static final UUID VIEWER = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final UUID TARGET = UUID.fromString("00000000-0000-0000-0000-000000000002");
@@ -78,7 +79,8 @@ class PlayerListenerTest {
   private VanishManager manager(List<PaperTestDoubles.FakePlayer> players) {
     Server server = PaperTestDoubles.server(players);
     Plugin plugin = PaperTestDoubles.plugin(server);
-    return new VanishManager(plugin, () -> players.stream().map(PaperTestDoubles.FakePlayer::player).toList());
+    return new VanishManager(
+        plugin, () -> players.stream().map(PaperTestDoubles.FakePlayer::player).toList());
   }
 
   private Plugin managerPlugin(VanishManager ignored) {

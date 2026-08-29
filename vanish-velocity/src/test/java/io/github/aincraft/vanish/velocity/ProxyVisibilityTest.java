@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+
+@SuppressWarnings("PMD.UseProperClassLoader")
 class ProxyVisibilityTest {
   private static final UUID VISIBLE = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final UUID VANISHED = UUID.fromString("00000000-0000-0000-0000-000000000002");
@@ -30,6 +32,7 @@ class ProxyVisibilityTest {
   void nonEmptyDestinationOfOnlyVanishedPlayersIsMasked() {
     assertTrue(ProxyVisibility.isVanishedOnly(List.of(VANISHED), Set.of(VANISHED)));
   }
+
   @Test
   void configuredViewerIsExemptFromVanishedFiltering() {
     Player viewer =

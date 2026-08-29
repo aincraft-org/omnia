@@ -36,6 +36,13 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPubSub;
 
 /** Asynchronous Redis transport and versioned state reconciler for a Paper backend. */
+@SuppressWarnings({
+  "PMD.AvoidCatchingGenericException",
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.AvoidLiteralsInIfCondition",
+  "PMD.CloseResource",
+  "PMD.NullAssignment"
+})
 public final class RedisPaperService implements VanishTransport {
   private final VanishManager manager;
   private final RedisConfig config;
@@ -284,7 +291,6 @@ public final class RedisPaperService implements VanishTransport {
       return !queuedDeltas.isEmpty();
     }
   }
-
 
   /** Completes a pending change only when the acknowledgement request ID matches. */
   public void onChangeAck(ChangeAck ack) {
@@ -587,7 +593,6 @@ public final class RedisPaperService implements VanishTransport {
     return retryDelayMillis;
   }
 
-
   private CompletionStage<VanishState> requestSnapshotForReconciliation() {
     CompletableFuture<VanishState> result;
     synchronized (snapshotRequestInFlight) {
@@ -623,12 +628,13 @@ public final class RedisPaperService implements VanishTransport {
     if (!running || closed.get()) {
       return;
     }
-    reconcile().whenComplete(
-        (ignored, error) -> {
-          if (error != null) {
-            logger.log(Level.WARNING, "Vanish Redis reconciliation failed", unwrap(error));
-          }
-        });
+    reconcile()
+        .whenComplete(
+            (ignored, error) -> {
+              if (error != null) {
+                logger.log(Level.WARNING, "Vanish Redis reconciliation failed", unwrap(error));
+              }
+            });
   }
 
   private void scheduleRetry() {
@@ -645,11 +651,11 @@ public final class RedisPaperService implements VanishTransport {
   }
 
   private void resetRetryDelay() {
-    retryDelayMillis = config == null ? RedisConfig.DEFAULT_RETRY_INITIAL_MILLIS : config.retryInitialMillis();
+    retryDelayMillis =
+        config == null ? RedisConfig.DEFAULT_RETRY_INITIAL_MILLIS : config.retryInitialMillis();
   }
 
-  private void onRequestFailure(
-      UUID requestId, CompletableFuture<?> result, Throwable error) {
+  private void onRequestFailure(UUID requestId, CompletableFuture<?> result, Throwable error) {
     if (pendingChanges.remove(requestId, result)) {
       result.completeExceptionally(unwrap(error));
     }
@@ -691,7 +697,8 @@ public final class RedisPaperService implements VanishTransport {
       return null;
     }
     Throwable cause = error;
-    while ((cause instanceof CompletionException || cause instanceof java.util.concurrent.ExecutionException)
+    while ((cause instanceof CompletionException
+            || cause instanceof java.util.concurrent.ExecutionException)
         && cause.getCause() != null) {
       cause = cause.getCause();
     }

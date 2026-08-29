@@ -19,6 +19,12 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
 
+@SuppressWarnings({
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.AvoidFieldNameMatchingMethodName",
+  "PMD.CompareObjectsWithEquals",
+  "PMD.UseProperClassLoader"
+})
 final class PaperTestDoubles {
   private static FakeServerState activeServer;
 
@@ -85,7 +91,8 @@ final class PaperTestDoubles {
           };
         };
     return (Plugin)
-        Proxy.newProxyInstance(Plugin.class.getClassLoader(), new Class<?>[] {Plugin.class}, handler);
+        Proxy.newProxyInstance(
+            Plugin.class.getClassLoader(), new Class<?>[] {Plugin.class}, handler);
   }
 
   static CommandSender sender(String name, String... permissions) {
@@ -132,7 +139,9 @@ final class PaperTestDoubles {
         };
     return (BukkitScheduler)
         Proxy.newProxyInstance(
-            BukkitScheduler.class.getClassLoader(), new Class<?>[] {BukkitScheduler.class}, handler);
+            BukkitScheduler.class.getClassLoader(),
+            new Class<?>[] {BukkitScheduler.class},
+            handler);
   }
 
   static BukkitTask task() {

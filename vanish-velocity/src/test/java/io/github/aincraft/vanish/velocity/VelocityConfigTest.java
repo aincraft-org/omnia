@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 class VelocityConfigTest {
   @TempDir Path tempDir;
 
@@ -23,8 +24,7 @@ class VelocityConfigTest {
 
   @Test
   void configuredSeeUuidsAreParsed() throws IOException {
-    UUID configured =
-        UUID.fromString("00000000-0000-0000-0000-000000000010");
+    UUID configured = UUID.fromString("00000000-0000-0000-0000-000000000010");
     Files.writeString(tempDir.resolve("config.yml"), "see-uuids: [" + configured + "]\n");
 
     assertEquals(Set.of(configured), VelocityConfig.from(tempDir).configuredSeeUuids());
@@ -32,8 +32,7 @@ class VelocityConfigTest {
 
   @Test
   void configuredSeeUuidsYamlListIsParsed() throws IOException {
-    UUID configured =
-        UUID.fromString("00000000-0000-0000-0000-000000000010");
+    UUID configured = UUID.fromString("00000000-0000-0000-0000-000000000010");
     Files.writeString(tempDir.resolve("config.yml"), "see-uuids:\n  - " + configured + "\n");
 
     assertEquals(Set.of(configured), VelocityConfig.from(tempDir).configuredSeeUuids());

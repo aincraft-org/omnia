@@ -1,0 +1,70 @@
+name: Bug report
+description: Report a reproducible problem with VanishNoPacket.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search existing issues first. Never include Redis passwords, forwarding secrets, or player-identifying data you do not need to share.
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: Version shown by the deployed Paper and Velocity jars.
+      placeholder: 2026.08.29-SNAPSHOT
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Paper, Velocity, Java, and Redis versions.
+      placeholder: Paper 26.2; Velocity 3.x; Java 25; Redis 7.x
+    validations:
+      required: true
+  - type: textarea
+    id: topology
+    attributes:
+      label: Deployment topology
+      description: Number of backends, backend IDs, and whether clients connect through Velocity only. Do not include secrets.
+      placeholder: Proxy plus alpha and beta; backend IDs alpha/beta; clients connect to Velocity.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact command, server switch, or lifecycle transition.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and logs
+      description: Redact secrets and unrelated player data. Include relevant stack traces.
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Product boundary and safety checks
+      options:
+        - label: I understand Paper hide/show and Velocity tab updates are client-visible updates, not zero-packet behavior.
+          required: true
+        - label: I did not include Redis credentials, forwarding secrets, or private server addresses.
+          required: true
+  - type: checkboxes
+    id: evidence
+    attributes:
+      label: Evidence
+      options:
+        - label: I checked the dated evidence files in docs/ and clearly marked any runtime result as PASS, FAIL, or BLOCKED rather than guessing.
+          required: true

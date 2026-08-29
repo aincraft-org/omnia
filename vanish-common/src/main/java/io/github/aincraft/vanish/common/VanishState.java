@@ -11,6 +11,7 @@ import java.util.UUID;
 
 /** An immutable versioned set of vanished player IDs. */
 public record VanishState(long version, Set<UUID> vanished) {
+  /** Validates IDs and stores them in deterministic order. */
   public VanishState {
     Objects.requireNonNull(vanished, "vanished");
     List<UUID> sorted = new ArrayList<>(vanished.size());

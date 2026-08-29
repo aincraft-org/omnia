@@ -30,6 +30,7 @@ public final class ServerConnectionGuard {
   public void onStateChanged(Set<UUID> vanished) {
     this.vanished = immutableUuids(vanished, "vanished");
   }
+
   /** Replaces configured viewers used by future connection checks. */
   public void onConfiguredSeeUuidsChanged(Set<UUID> configuredSeeUuids) {
     this.configuredSeeUuids = immutableUuids(configuredSeeUuids, "configuredSeeUuids");

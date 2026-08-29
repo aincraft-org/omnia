@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- Bukkit/Velocity APIs are nullable to analysis but validated or handled at runtime. -->
+  <Match>
+    <Class name="io.github.aincraft.vanish.paper.RedisConfig"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+  </Match>
+  <Match>
+    <Class name="io.github.aincraft.vanish.velocity.VanishStateStore"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+  </Match>
+  <!-- These fields are coordinated under the surrounding lifecycle/state locks. -->
+  <Match>
+    <Class name="io.github.aincraft.vanish.paper.RedisPaperService"/>
+    <Bug pattern="AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE"/>
+  </Match>
+  <Match>
+    <Class name="io.github.aincraft.vanish.paper.RedisPaperService"/>
+    <Bug pattern="JLM_JSR166_UTILCONCURRENT_MONITORENTER"/>
+  </Match>
+  <!-- Plugin/service accessors intentionally expose managed instances, not mutable state. -->
+  <Match>
+    <Class name="io.github.aincraft.vanish.paper.VanishPaperPlugin"/>
+    <Bug pattern="EI_EXPOSE_REP"/>
+  </Match>
+  <Match>
+    <Class name="io.github.aincraft.vanish.velocity.VanishStateStore$LoadResult"/>
+    <Bug pattern="EI_EXPOSE_REP"/>
+  </Match>
+  <Match>
+    <Class name="io.github.aincraft.vanish.velocity.VanishVelocityPlugin"/>
+    <Bug pattern="EI_EXPOSE_REP"/>
+  </Match>
+  <Match>
+    <Class name="io.github.aincraft.vanish.velocity.VanishVelocityPlugin"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <Match>
+    <Class name="io.github.aincraft.vanish.velocity.VanishVelocityPlugin"/>
+    <Bug pattern="URF_UNREAD_FIELD"/>
+  </Match>
+  <!-- Test doubles intentionally model static Bukkit state and dynamic proxies. -->
+  <Match>
+    <Class name="io.github.aincraft.vanish.paper.PaperTestDoubles"/>
+    <Bug pattern="LI_LAZY_INIT_UPDATE_STATIC"/>
+  </Match>
+</FindBugsFilter>

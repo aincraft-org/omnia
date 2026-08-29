@@ -4,6 +4,13 @@ redis:
   username: ""
   password: ""
   database: 0
+# Redis client and reconnect timings (all values are milliseconds).
+connection-timeout-millis: 5000
+socket-timeout-millis: 5000
+blocking-socket-timeout-millis: 0
+retry-initial-millis: 500
+retry-max-millis: 30000
+
 
 state-file: vanish-state.json
 server-selection-masking: true

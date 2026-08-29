@@ -26,6 +26,13 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Durable, proxy-owned versioned vanish state. */
+@SuppressWarnings({
+  "PMD.AvoidCatchingGenericException",
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.AvoidFieldNameMatchingMethodName",
+  "PMD.AvoidLiteralsInIfCondition",
+  "PMD.CloseResource"
+})
 public final class VanishStateStore {
   private static final VanishState EMPTY_STATE = new VanishState(0, Set.of());
 
@@ -50,7 +57,8 @@ public final class VanishStateStore {
     Path normalized = file.toAbsolutePath().normalize();
     if (Files.notExists(normalized)) {
       VanishStateStore store =
-          new VanishStateStore(normalized, EMPTY_STATE, true, true, VanishStateStore::writeAtomically);
+          new VanishStateStore(
+              normalized, EMPTY_STATE, true, true, VanishStateStore::writeAtomically);
       return new LoadResult(store, null, null);
     }
 
@@ -63,7 +71,8 @@ public final class VanishStateStore {
     } catch (IOException | RuntimeException failure) {
       Path backup = preserveCorruptFile(normalized);
       VanishStateStore store =
-          new VanishStateStore(normalized, EMPTY_STATE, false, false, VanishStateStore::writeAtomically);
+          new VanishStateStore(
+              normalized, EMPTY_STATE, false, false, VanishStateStore::writeAtomically);
       return new LoadResult(store, backup, failure);
     }
   }
@@ -102,7 +111,10 @@ public final class VanishStateStore {
     } catch (IOException | RuntimeException failure) {
       ChangeAck ack =
           new ChangeAck(
-              request.requestId(), false, state.version(), "Unable to persist vanish state: " + failure.getMessage());
+              request.requestId(),
+              false,
+              state.version(),
+              "Unable to persist vanish state: " + failure.getMessage());
       return new ChangeResult(ack, null, state);
     }
 
@@ -169,7 +181,8 @@ public final class VanishStateStore {
       UUID playerId = parseUuid(entry.getKey());
       JsonElement value = entry.getValue();
       if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
-        throw new IllegalArgumentException("Vanish value for " + entry.getKey() + " must be boolean");
+        throw new IllegalArgumentException(
+            "Vanish value for " + entry.getKey() + " must be boolean");
       }
       if (value.getAsBoolean()) {
         vanished.add(playerId);

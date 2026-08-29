@@ -4,7 +4,6 @@ import io.github.aincraft.vanish.common.ChangeAck;
 import io.github.aincraft.vanish.common.ChangeRequest;
 import io.github.aincraft.vanish.common.SnapshotRequest;
 import io.github.aincraft.vanish.common.SnapshotResponse;
-import io.github.aincraft.vanish.common.StateDelta;
 import io.github.aincraft.vanish.common.VanishMessages;
 import io.github.aincraft.vanish.common.VanishState;
 import java.util.Objects;
@@ -30,6 +29,12 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPubSub;
 
 /** Asynchronous Redis coordinator for the Velocity-owned vanish state. */
+@SuppressWarnings({
+  "PMD.AvoidCatchingGenericException",
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.AvoidFieldNameMatchingMethodName",
+  "PMD.CloseResource"
+})
 public final class RedisVelocityService implements AutoCloseable {
   private final VanishStateStore store;
   private final VelocityConfig config;
@@ -87,7 +92,10 @@ public final class RedisVelocityService implements AutoCloseable {
         .whenComplete(
             (ignored, failure) -> {
               if (failure != null) {
-                logger.log(Level.WARNING, "Unable to publish the initial vanish snapshot", unwrap(failure));
+                logger.log(
+                    Level.WARNING,
+                    "Unable to publish the initial vanish snapshot",
+                    unwrap(failure));
               }
             });
     if (subscriberExecutor != null) {
@@ -100,7 +108,9 @@ public final class RedisVelocityService implements AutoCloseable {
     return store.hasValidSnapshot() ? store.snapshot() : null;
   }
 
-  /** Registers a listener for authoritative state changes and immediately supplies the current view. */
+  /**
+   * Registers a listener for authoritative state changes and immediately supplies the current view.
+   */
   public void addStateListener(Consumer<VanishState> listener) {
     Objects.requireNonNull(listener, "listener");
     stateListeners.add(listener);
@@ -124,6 +134,7 @@ public final class RedisVelocityService implements AutoCloseable {
   public boolean redisAvailable() {
     return redisAvailable;
   }
+
   /** Serializes and applies a desired state request in arrival order. */
   public CompletionStage<ChangeAck> requestChange(ChangeRequest request) {
     Objects.requireNonNull(request, "request");
@@ -131,19 +142,26 @@ public final class RedisVelocityService implements AutoCloseable {
     enqueue(
         () -> {
           if (closed.get()) {
-            result.completeExceptionally(new CancellationException("Redis Velocity service is closed"));
+            result.completeExceptionally(
+                new CancellationException("Redis Velocity service is closed"));
             return;
           }
           if (!store.enabled() || !store.hasValidSnapshot()) {
             result.complete(
                 new ChangeAck(
-                    request.requestId(), false, store.snapshot().version(), "State store is disabled"));
+                    request.requestId(),
+                    false,
+                    store.snapshot().version(),
+                    "State store is disabled"));
             return;
           }
           if (!redisAvailable) {
             result.complete(
                 new ChangeAck(
-                    request.requestId(), false, store.snapshot().version(), "Redis is unavailable"));
+                    request.requestId(),
+                    false,
+                    store.snapshot().version(),
+                    "Redis is unavailable"));
             return;
           }
           VanishStateStore.ChangeResult change = store.apply(request);
@@ -183,7 +201,10 @@ public final class RedisVelocityService implements AutoCloseable {
       redisAvailable = false;
       result.complete(
           new ChangeAck(
-              ack.requestId(), false, ack.version(), "Redis publication failed: " + message(failure)));
+              ack.requestId(),
+              false,
+              ack.version(),
+              "Redis publication failed: " + message(failure)));
     }
   }
 
@@ -199,7 +220,8 @@ public final class RedisVelocityService implements AutoCloseable {
     enqueue(
         () -> {
           if (closed.get()) {
-            result.completeExceptionally(new CancellationException("Redis Velocity service is closed"));
+            result.completeExceptionally(
+                new CancellationException("Redis Velocity service is closed"));
             return;
           }
           if (!store.enabled() || !store.hasValidSnapshot()) {
@@ -230,7 +252,8 @@ public final class RedisVelocityService implements AutoCloseable {
     enqueue(
         () -> {
           if (closed.get()) {
-            result.completeExceptionally(new CancellationException("Redis Velocity service is closed"));
+            result.completeExceptionally(
+                new CancellationException("Redis Velocity service is closed"));
             return;
           }
           try {
@@ -277,7 +300,9 @@ public final class RedisVelocityService implements AutoCloseable {
     }
   }
 
-  /** Records a Redis disconnect; the cached state remains available but new changes are rejected. */
+  /**
+   * Records a Redis disconnect; the cached state remains available but new changes are rejected.
+   */
   public void onRedisDisconnect(Throwable failure) {
     redisAvailable = false;
     if (failure != null) {
@@ -311,7 +336,8 @@ public final class RedisVelocityService implements AutoCloseable {
     enqueue(
         () -> {
           if (closed.get()) {
-            result.completeExceptionally(new CancellationException("Redis Velocity service is closed"));
+            result.completeExceptionally(
+                new CancellationException("Redis Velocity service is closed"));
             return;
           }
           if (!store.enabled() || !store.hasValidSnapshot()) {
@@ -331,6 +357,7 @@ public final class RedisVelocityService implements AutoCloseable {
         result);
     return result;
   }
+
   private void notifyStateListeners(VanishState state) {
     for (Consumer<VanishState> listener : stateListeners) {
       notifyListener(listener, state);
@@ -344,7 +371,6 @@ public final class RedisVelocityService implements AutoCloseable {
       logger.log(Level.WARNING, "Vanish state listener failed", failure);
     }
   }
-
 
   private void enqueue(Runnable operation, CompletableFuture<?> result) {
     try {
@@ -401,7 +427,8 @@ public final class RedisVelocityService implements AutoCloseable {
 
   private static Throwable unwrap(Throwable failure) {
     Throwable cause = failure;
-    while ((cause instanceof CompletionException || cause instanceof java.util.concurrent.ExecutionException)
+    while ((cause instanceof CompletionException
+            || cause instanceof java.util.concurrent.ExecutionException)
         && cause.getCause() != null) {
       cause = cause.getCause();
     }
@@ -416,6 +443,7 @@ public final class RedisVelocityService implements AutoCloseable {
     long publish(String channel, String message);
 
     void subscribe(BiConsumer<String, String> receiver, String... channels);
+
     default void subscribe(
         BiConsumer<String, String> receiver, Runnable onConnected, String... channels) {
       subscribe(receiver, channels);

@@ -17,6 +17,11 @@ import org.bukkit.command.Command;
 import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings({
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.AvoidFieldNameMatchingMethodName",
+  "PMD.CloseResource"
+})
 class VanishCommandTest {
   private static final UUID SENDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000011");
   private static final UUID TARGET_ID = UUID.fromString("00000000-0000-0000-0000-000000000012");
@@ -29,11 +34,9 @@ class VanishCommandTest {
         }
       };
 
-
   @Test
   void selfToggleRequiresUsePermission() {
-    PaperTestDoubles.FakePlayer sender =
-        new PaperTestDoubles.FakePlayer(SENDER_ID, "Sender");
+    PaperTestDoubles.FakePlayer sender = new PaperTestDoubles.FakePlayer(SENDER_ID, "Sender");
     Server server = PaperTestDoubles.server(List.of(sender));
     RecordingTransport transport = new RecordingTransport(new VanishState(4, Set.of()));
     VanishCommand command = command(server, transport);
@@ -100,7 +103,8 @@ class VanishCommandTest {
 
     assertEquals(1, transport.snapshotCalls);
     assertTrue(sender.messages().stream().anyMatch(message -> message.contains("version 4")));
-    assertTrue(sender.messages().stream().anyMatch(message -> message.contains(TARGET_ID.toString())));
+    assertTrue(
+        sender.messages().stream().anyMatch(message -> message.contains(TARGET_ID.toString())));
   }
 
   @Test
@@ -114,7 +118,8 @@ class VanishCommandTest {
     command.onCommand(sender.player(), COMMAND, "vanish", new String[] {"Missing"});
 
     assertEquals(0, transport.snapshotCalls);
-    assertTrue(sender.messages().stream().anyMatch(message -> message.contains("No online player")));
+    assertTrue(
+        sender.messages().stream().anyMatch(message -> message.contains("No online player")));
   }
 
   private static VanishCommand command(Server server, RecordingTransport transport) {

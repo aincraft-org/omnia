@@ -17,7 +17,9 @@ public final class ProxyVisibility {
 
   private ProxyVisibility() {}
 
-  /** Returns true only when a destination has at least one connected player and all are vanished. */
+  /**
+   * Returns true only when a destination has at least one connected player and all are vanished.
+   */
   public static boolean isVanishedOnly(Collection<UUID> connected, Set<UUID> vanished) {
     Objects.requireNonNull(connected, "connected");
     Objects.requireNonNull(vanished, "vanished");

@@ -15,9 +15,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 class VanishStateStoreTest {
-  private static final UUID PLAYER =
-      UUID.fromString("00000000-0000-0000-0000-000000000001");
+  private static final UUID PLAYER = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
   @TempDir Path tempDir;
 
@@ -34,8 +34,7 @@ class VanishStateStoreTest {
   void validJsonRoundTripsExactPersistedShape() throws IOException {
     Path file = tempDir.resolve("vanish-state.json");
     Files.writeString(
-        file,
-        "{\"version\":7,\"vanished\":{\"00000000-0000-0000-0000-000000000001\":true}}");
+        file, "{\"version\":7,\"vanished\":{\"00000000-0000-0000-0000-000000000001\":true}}");
 
     VanishStateStore store = VanishStateStore.load(file).store();
 
@@ -64,8 +63,7 @@ class VanishStateStoreTest {
   void idempotentDesiredStateReturnsCurrentVersionWithoutDelta() throws IOException {
     Path file = tempDir.resolve("vanish-state.json");
     Files.writeString(
-        file,
-        "{\"version\":7,\"vanished\":{\"00000000-0000-0000-0000-000000000001\":true}}");
+        file, "{\"version\":7,\"vanished\":{\"00000000-0000-0000-0000-000000000001\":true}}");
     VanishStateStore store = VanishStateStore.load(file).store();
 
     VanishStateStore.ChangeResult result =
@@ -104,7 +102,11 @@ class VanishStateStoreTest {
     assertFalse(loaded.store().enabled());
     assertTrue(Files.notExists(file));
     try (var backups = Files.list(tempDir)) {
-      Path backup = backups.filter(path -> path.getFileName().toString().endsWith(".bak")).findFirst().orElseThrow();
+      Path backup =
+          backups
+              .filter(path -> path.getFileName().toString().endsWith(".bak"))
+              .findFirst()
+              .orElseThrow();
       assertEquals(corrupt, Files.readString(backup));
     }
   }
@@ -156,11 +158,10 @@ class VanishStateStoreTest {
         VanishStateStore.forTesting(
             file,
             new VanishState(1, Set.of(PLAYER)),
-            (ignoredPath, ignoredState) ->
-                {
-                  throw new java.nio.file.AtomicMoveNotSupportedException(
-                      ignoredPath.toString(), file.toString(), "atomic move unavailable");
-                });
+            (ignoredPath, ignoredState) -> {
+              throw new java.nio.file.AtomicMoveNotSupportedException(
+                  ignoredPath.toString(), file.toString(), "atomic move unavailable");
+            });
 
     VanishStateStore.ChangeResult result =
         store.apply(new ChangeRequest(UUID.randomUUID(), PLAYER, false));

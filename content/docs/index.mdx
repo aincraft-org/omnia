@@ -1,0 +1,19 @@
+---
+title: VanishNoPacket
+description: Cross-backend vanish for Velocity and Paper
+---
+
+# VanishNoPacket
+
+Keep staff visibility consistent while players move between Paper backends. Velocity owns one authoritative vanish state, Redis carries that state to each backend, and Paper applies public hide/show APIs locally.
+
+> **What this is not:** the default product does not inject hand-crafted client packets, use ProtocolLib, or use NMS. Public hide/show and tab-list operations are client-visible updates, so this is not zero-packet behavior. Direct player-info packet correction (FR-008) is absent and approval-gated.
+
+## Choose your depth
+
+1. **Idea:** install one Velocity plugin, one Paper plugin per backend, and one shared Redis service.
+2. **[Basics: get connected](./getting-started.mdx):** configure the topology and verify the deployable jars.
+3. **[Everyday operations](./everyday.mdx):** use `/vanish`, `/vanish status`, `/vservers`, and `/vanishservers`.
+4. **[Advanced operations](./advanced.mdx):** understand state files, channels, snapshot/delta recovery, and fail-closed behavior.
+
+Start with [Getting started](./getting-started.mdx) if you are deploying the plugin for the first time.

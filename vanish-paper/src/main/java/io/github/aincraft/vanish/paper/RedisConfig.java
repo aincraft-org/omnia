@@ -27,6 +27,7 @@ public record RedisConfig(
   public static final long DEFAULT_RETRY_INITIAL_MILLIS = 500L;
   public static final long DEFAULT_RETRY_MAX_MILLIS = 30_000L;
 
+  /** Validates Redis settings and retry bounds. */
   public RedisConfig {
     Objects.requireNonNull(host, "host");
     Objects.requireNonNull(username, "username");
@@ -55,6 +56,7 @@ public record RedisConfig(
     }
   }
 
+  /** Creates settings with default timeout and retry values. */
   public RedisConfig(
       String host, int port, String username, String password, int database, String backendId) {
     this(
@@ -72,15 +74,18 @@ public record RedisConfig(
         DEFAULT_RETRY_MAX_MILLIS);
   }
 
+  /** Creates settings with default database and timeout values. */
   public RedisConfig(String host, int port, String username, String password, String backendId) {
     this(host, port, username, password, DEFAULT_DATABASE, backendId);
   }
 
+  /** Loads settings from a Paper plugin configuration. */
   public static RedisConfig from(JavaPlugin plugin) {
     Objects.requireNonNull(plugin, "plugin");
     return from(plugin.getConfig());
   }
 
+  /** Loads settings from a Bukkit configuration. */
   public static RedisConfig from(FileConfiguration config) {
     Objects.requireNonNull(config, "config");
     return new RedisConfig(
@@ -92,8 +97,7 @@ public record RedisConfig(
         config.getString("backend-id", "paper-local"),
         config.getInt("redis.connection-timeout-ms", DEFAULT_CONNECTION_TIMEOUT_MILLIS),
         config.getInt("redis.socket-timeout-ms", DEFAULT_SOCKET_TIMEOUT_MILLIS),
-        config.getInt(
-            "redis.blocking-socket-timeout-ms", DEFAULT_BLOCKING_SOCKET_TIMEOUT_MILLIS),
+        config.getInt("redis.blocking-socket-timeout-ms", DEFAULT_BLOCKING_SOCKET_TIMEOUT_MILLIS),
         config.getLong("redis.request-timeout-ms", DEFAULT_REQUEST_TIMEOUT_MILLIS),
         config.getLong("redis.retry-initial-ms", DEFAULT_RETRY_INITIAL_MILLIS),
         config.getLong("redis.retry-max-ms", DEFAULT_RETRY_MAX_MILLIS));

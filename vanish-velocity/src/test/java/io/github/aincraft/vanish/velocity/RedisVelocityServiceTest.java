@@ -18,19 +18,23 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.CloseResource"})
 class RedisVelocityServiceTest {
-  private static final UUID PLAYER =
-      UUID.fromString("00000000-0000-0000-0000-000000000001");
+  private static final UUID PLAYER = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
   @TempDir Path tempDir;
 
   @Test
   void startupWritesDurableSnapshotAndChangePublishesSetThenDelta() {
     FakeRedis redis = new FakeRedis();
-    RedisVelocityService service = service(redis, VanishStateStore.load(tempDir.resolve("state.json")).store());
+    RedisVelocityService service =
+        service(redis, VanishStateStore.load(tempDir.resolve("state.json")).store());
 
     service.start();
-    service.requestChange(new ChangeRequest(UUID.randomUUID(), PLAYER, true)).toCompletableFuture().join();
+    service
+        .requestChange(new ChangeRequest(UUID.randomUUID(), PLAYER, true))
+        .toCompletableFuture()
+        .join();
 
     assertEquals(2, redis.operations.size());
     assertTrue(redis.operations.get(0).startsWith("set:" + VanishMessages.SNAPSHOT_KEY));
@@ -63,7 +67,10 @@ class RedisVelocityServiceTest {
     RedisVelocityService service = service(redis, store);
 
     service.start();
-    service.requestChange(new ChangeRequest(UUID.randomUUID(), PLAYER, true)).toCompletableFuture().join();
+    service
+        .requestChange(new ChangeRequest(UUID.randomUUID(), PLAYER, true))
+        .toCompletableFuture()
+        .join();
     int publishes = redis.published.size();
     var ack =
         service
@@ -83,11 +90,17 @@ class RedisVelocityServiceTest {
     VanishStateStore store = VanishStateStore.load(tempDir.resolve("state.json")).store();
     RedisVelocityService service = service(redis, store);
     service.start();
-    service.requestChange(new ChangeRequest(UUID.randomUUID(), PLAYER, true)).toCompletableFuture().join();
+    service
+        .requestChange(new ChangeRequest(UUID.randomUUID(), PLAYER, true))
+        .toCompletableFuture()
+        .join();
     service.onRedisDisconnect(new IllegalStateException("offline"));
 
     var ack =
-        service.requestChange(new ChangeRequest(UUID.randomUUID(), PLAYER, false)).toCompletableFuture().join();
+        service
+            .requestChange(new ChangeRequest(UUID.randomUUID(), PLAYER, false))
+            .toCompletableFuture()
+            .join();
 
     assertFalse(ack.accepted());
     assertEquals(new VanishState(1, Set.of(PLAYER)), service.snapshot());
@@ -120,7 +133,9 @@ class RedisVelocityServiceTest {
 
     assertEquals(1, redis.published.size());
     assertEquals("snapshot_response", redis.published.get(0).type());
-    assertEquals(requestId, VanishMessages.decodeSnapshotResponse(redis.published.get(0).message).requestId());
+    assertEquals(
+        requestId,
+        VanishMessages.decodeSnapshotResponse(redis.published.get(0).message).requestId());
   }
 
   private static RedisVelocityService service(FakeRedis redis, VanishStateStore store) {
@@ -148,7 +163,8 @@ class RedisVelocityServiceTest {
     }
 
     @Override
-    public void subscribe(java.util.function.BiConsumer<String, String> receiver, String... channels) {}
+    public void subscribe(
+        java.util.function.BiConsumer<String, String> receiver, String... channels) {}
 
     @Override
     public void close() {}

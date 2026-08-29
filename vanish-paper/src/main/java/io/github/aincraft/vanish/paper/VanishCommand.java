@@ -20,29 +20,35 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /** Handles vanish requests without changing local state before authority confirmation. */
+@SuppressWarnings({
+  "PMD.AvoidCatchingGenericException",
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.AvoidLiteralsInIfCondition",
+  "PMD.CloseResource"
+})
 public final class VanishCommand implements TabExecutor {
   private final Server server;
   private final Plugin plugin;
   private final Supplier<? extends VanishTransport> transport;
 
+  /** Creates a command using a fixed authority transport. */
   public VanishCommand(JavaPlugin plugin, VanishTransport transport) {
     this(plugin.getServer(), plugin, () -> transport);
   }
 
+  /** Creates a command resolving the current authority transport. */
   public VanishCommand(JavaPlugin plugin, Supplier<? extends VanishTransport> transport) {
     this(plugin.getServer(), plugin, transport);
   }
 
-  VanishCommand(
-      Server server, Plugin plugin, Supplier<? extends VanishTransport> transport) {
+  VanishCommand(Server server, Plugin plugin, Supplier<? extends VanishTransport> transport) {
     this.server = server;
     this.plugin = plugin;
     this.transport = transport;
   }
 
   @Override
-  public boolean onCommand(
-      CommandSender sender, Command command, String label, String[] args) {
+  public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
     if (args.length == 1 && args[0].equalsIgnoreCase("status")) {
       if (!sender.hasPermission(Permissions.ADMIN)) {
         send(sender, "You do not have permission to view vanish status.");
@@ -74,7 +80,8 @@ public final class VanishCommand implements TabExecutor {
         send(sender, "No online player has that exact name.");
         return true;
       }
-      boolean self = sender instanceof Player player && player.getUniqueId().equals(target.getUniqueId());
+      boolean self =
+          sender instanceof Player player && player.getUniqueId().equals(target.getUniqueId());
       String permission = self ? Permissions.USE : Permissions.OTHERS;
       if (!sender.hasPermission(permission)) {
         send(sender, "You do not have permission to vanish that player.");
@@ -137,8 +144,7 @@ public final class VanishCommand implements TabExecutor {
             return;
           }
           ChangeRequest request =
-              new ChangeRequest(
-                  UUID.randomUUID(), targetId, !state.vanished().contains(targetId));
+              new ChangeRequest(UUID.randomUUID(), targetId, !state.vanished().contains(targetId));
           CompletionStage<ChangeAck> response;
           try {
             response = authority.requestChange(request);

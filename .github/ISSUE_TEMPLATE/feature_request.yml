@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose a user-facing improvement to VanishNoPacket.
+title: "feature: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the player or operator problem first. Features that require direct packet injection, ProtocolLib, NMS, or raw packet construction need explicit design and approval; FR-008 is not part of the default product.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Who is affected, and what workflow is currently difficult or impossible?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Explain commands, permissions, configuration, and cross-backend effects.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Deployment and compatibility impact
+      description: Cover Paper backends, Velocity, Redis, state reconciliation, and upgrades.
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Boundary acknowledgement
+      options:
+        - label: I understand this project requires proxy-authoritative state plus per-backend enforcement for cross-backend vanish.
+          required: true
+        - label: If this request needs packet-level player-info correction, I have identified it as an approval-gated proposal rather than assuming it exists.
+          required: true

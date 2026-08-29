@@ -1,0 +1,50 @@
+---
+title: Advanced state and recovery
+description: Redis channels, versioned reconciliation, and fail-closed recovery
+---
+
+# Advanced state and recovery
+
+> **Advanced callout:** this page is for operators diagnosing startup, reconnect, or state convergence. Do not edit a live state file or claim runtime behavior that is not present in the dated evidence records.
+
+## Durable state file
+
+Velocity's `state-file` is a strict JSON object with exactly these fields:
+
+```json
+{
+  "version": 3,
+  "vanished": {
+    "01234567-89ab-cdef-0123-456789abcdef": true
+  }
+}
+```
+
+`version` is a non-negative integer. `vanished` maps canonical UUID strings to booleans. Unknown fields, malformed JSON, trailing content, negative versions, non-canonical UUIDs, and non-boolean values are rejected. The writer uses a temporary file and atomic replacement.
+
+A missing file starts as an empty valid state. A corrupt or unreadable file is moved to `vanish-state.json.bak` (or a UUID-suffixed `.bak` when needed). The proxy then uses an empty invalid state, disables mutations and Redis publication, and does not register the active proxy handlers. This fail-closed path prevents an uncertain state from being exposed. Investigate the backup, repair or remove the original only while the proxy is stopped, and restart.
+
+## Redis protocol
+
+All messages use schema version `1` and strict JSON envelopes.
+
+| Object | Purpose |
+| --- | --- |
+| `vanish:state:snapshot` | Durable full `vanish_state` snapshot |
+| `vanish:state:requests` | Paper change and snapshot requests to Velocity |
+| `vanish:state:events` | Versioned `state_delta` events from Velocity |
+| `vanish:state:responses` | `change_ack` and `snapshot_response` messages |
+
+A snapshot envelope has `schema`, `type: "vanish_state"`, `version`, and a sorted `vanished` UUID array. A delta has `version`, `playerId`, and desired `vanished`. Requests and responses carry UUID request IDs; snapshot requests/responses also carry `backendId`.
+
+## Snapshot and delta reconciliation
+
+The proxy serializes desired-state changes, persists a new version, updates `vanish:state:snapshot`, publishes a delta, and publishes an acknowledgement. Paper applies a delta only when it is the next version. Older deltas are ignored. A missing or out-of-order version is queued and triggers a full snapshot request. After the snapshot arrives, queued contiguous deltas are drained; an unresolved gap triggers another reconciliation.
+
+At startup, the proxy loads and publishes its durable snapshot, then subscribes to requests. A Paper backend subscribes to events and responses, waits for both subscriptions, and reconciles from the durable key. On Redis reconnect, subscribers retry with bounded backoff and reconcile again. Pre-login and join paths require a valid state before applying visibility; a valid cached state can be used while a fresh read is retried.
+
+> **Practical warning:** do not run multiple independent Redis databases or use duplicate backend IDs for one proxy. Every backend must reach the same Redis authority and identify itself distinctly for snapshot requests.
+
+## Evidence boundary
+
+The repository's [`docs/poc-results-2026-08-29.md`](../../docs/poc-results-2026-08-29.md) and [`docs/smoke-results-2026-08-29.md`](../../docs/smoke-results-2026-08-29.md) are evidence records, not a promise of live timing. Their required client/network matrix is explicitly **BLOCKED** by user-owned listeners and a harness lobby-port gate. Redis readiness and artifact packaging passed, but no blocked scenario is a runtime pass. The default boundary remains public Paper/Velocity APIs, not direct packet injection, ProtocolLib, or NMS; FR-008 direct player-info packet correction is absent and approval-gated.

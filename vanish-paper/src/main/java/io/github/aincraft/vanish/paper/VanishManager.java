@@ -25,16 +25,18 @@ public final class VanishManager {
   private final Map<VisibilityPair, Boolean> appliedVisibility = new HashMap<>();
   private final Map<UUID, Boolean> permissionFingerprints = new HashMap<>();
 
+  /** Creates a manager using the server's online-player view. */
   public VanishManager(JavaPlugin plugin) {
     this(plugin, () -> plugin.getServer().getOnlinePlayers());
   }
+
+  /** Creates a manager with an injectable online-player source. */
   public VanishManager(
       JavaPlugin plugin, Supplier<? extends Collection<? extends Player>> onlinePlayers) {
     this((Plugin) plugin, onlinePlayers);
   }
 
-  VanishManager(
-      Plugin plugin, Supplier<? extends Collection<? extends Player>> onlinePlayers) {
+  VanishManager(Plugin plugin, Supplier<? extends Collection<? extends Player>> onlinePlayers) {
     this.plugin = Objects.requireNonNull(plugin, "plugin");
     this.onlinePlayers = Objects.requireNonNull(onlinePlayers, "onlinePlayers");
   }
