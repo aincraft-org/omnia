@@ -5,6 +5,12 @@ redis:
   username: ""
   password: ""
   database: 0
+  connection-timeout-ms: 5000
+  socket-timeout-ms: 5000
+  blocking-socket-timeout-ms: 0
+  request-timeout-ms: 5000
+  retry-initial-ms: 500
+  retry-max-ms: 30000
 
 # Set a distinct value for every Paper backend connected to the proxy.
 backend-id: paper-local

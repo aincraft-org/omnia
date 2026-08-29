@@ -4,6 +4,7 @@ import java.util.UUID;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -14,11 +15,17 @@ import org.bukkit.scheduler.BukkitTask;
 public final class PlayerListener implements Listener {
   private final JavaPlugin plugin;
   private final VanishManager manager;
+  private final RedisPaperService redis;
   private BukkitTask permissionTask;
 
   public PlayerListener(JavaPlugin plugin, VanishManager manager) {
+    this(plugin, manager, null);
+  }
+
+  public PlayerListener(JavaPlugin plugin, VanishManager manager, RedisPaperService redis) {
     this.plugin = plugin;
     this.manager = manager;
+    this.redis = redis;
   }
 
   /** Starts the main-thread permission fingerprint reconciliation loop. */
@@ -39,11 +46,40 @@ public final class PlayerListener implements Listener {
   }
 
   @EventHandler
+  public void onPreLogin(AsyncPlayerPreLoginEvent event) {
+    if (redis == null) {
+      return;
+    }
+    redis
+        .reconcileForPreLogin()
+        .whenComplete(
+            (ignored, error) -> {
+              if (error != null && !redis.hasValidState()) {
+                event.disallow(
+                    AsyncPlayerPreLoginEvent.Result.KICK_OTHER,
+                    "Vanish state is temporarily unavailable; please try again.");
+              }
+            });
+  }
+
+  @EventHandler
   public void onJoin(PlayerJoinEvent event) {
     Player player = event.getPlayer();
-    manager.reconcileViewer(player);
-    manager.reconcileTarget(player);
-    plugin.getServer().getScheduler().runTask(plugin, manager::reapplyAll);
+    if (redis == null) {
+      applyJoinVisibility(player);
+      return;
+    }
+    redis
+        .reconcileForJoin()
+        .whenComplete(
+            (ignored, error) -> {
+              if (error == null || redis.hasValidState()) {
+                plugin
+                    .getServer()
+                    .getScheduler()
+                    .runTask(plugin, () -> applyJoinVisibility(player));
+              }
+            });
   }
 
   @EventHandler
@@ -58,5 +94,11 @@ public final class PlayerListener implements Listener {
     UUID playerId = event.getPlayer().getUniqueId();
     manager.removeViewer(playerId);
     manager.removeTarget(playerId);
+  }
+
+  private void applyJoinVisibility(Player player) {
+    manager.reconcileViewer(player);
+    manager.reconcileTarget(player);
+    plugin.getServer().getScheduler().runTaskLater(plugin, manager::reapplyAll, 1L);
   }
 }

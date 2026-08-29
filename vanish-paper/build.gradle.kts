@@ -18,6 +18,7 @@ java {
 }
 
 dependencies {
+    implementation("redis.clients:jedis:8.0.1")
     compileOnly("io.papermc.paper:paper-api:26.2.build.+")
     testImplementation("io.papermc.paper:paper-api:26.2.build.+")
     implementation(project(":vanish-common"))
