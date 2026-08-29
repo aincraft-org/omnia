@@ -129,4 +129,44 @@ class VanishStateStoreTest {
     assertEquals(valid, Files.readString(file));
     assertEquals(new VanishState(1, Set.of(PLAYER)), failingStore.snapshot());
   }
+
+  @Test
+  void versionOverflowIsRejectedWithoutMutation() throws IOException {
+    Path file = tempDir.resolve("vanish-state.json");
+    Files.writeString(file, "{\"version\":9223372036854775807,\"vanished\":{}}");
+    VanishStateStore store = VanishStateStore.load(file).store();
+
+    VanishStateStore.ChangeResult result =
+        store.apply(new ChangeRequest(UUID.randomUUID(), PLAYER, true));
+
+    assertFalse(result.ack().accepted());
+    assertEquals(Long.MAX_VALUE, result.ack().version());
+    assertEquals(null, result.delta());
+    assertEquals(new VanishState(Long.MAX_VALUE, Set.of()), result.snapshot());
+    assertEquals("{\"version\":9223372036854775807,\"vanished\":{}}", Files.readString(file));
+  }
+
+  @Test
+  void unsupportedAtomicReplacementFailsClosedAndPreservesFile() throws IOException {
+    Path file = tempDir.resolve("vanish-state.json");
+    VanishStateStore initial = VanishStateStore.load(file).store();
+    initial.apply(new ChangeRequest(UUID.randomUUID(), PLAYER, true));
+    String valid = Files.readString(file);
+    VanishStateStore store =
+        VanishStateStore.forTesting(
+            file,
+            new VanishState(1, Set.of(PLAYER)),
+            (ignoredPath, ignoredState) ->
+                {
+                  throw new java.nio.file.AtomicMoveNotSupportedException(
+                      ignoredPath.toString(), file.toString(), "atomic move unavailable");
+                });
+
+    VanishStateStore.ChangeResult result =
+        store.apply(new ChangeRequest(UUID.randomUUID(), PLAYER, false));
+
+    assertFalse(result.ack().accepted());
+    assertEquals(valid, Files.readString(file));
+    assertEquals(new VanishState(1, Set.of(PLAYER)), store.snapshot());
+  }
 }

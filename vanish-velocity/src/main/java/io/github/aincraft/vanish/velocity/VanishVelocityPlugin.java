@@ -26,6 +26,7 @@ public final class VanishVelocityPlugin {
   private final ExecutorService initializationExecutor;
   private final AtomicBoolean closed = new AtomicBoolean();
   private volatile RedisVelocityService redisService;
+  private final Object lifecycleLock = new Object();
 
   @Inject
   public VanishVelocityPlugin(@DataDirectory Path dataDirectory, Logger logger) {
@@ -58,20 +59,22 @@ public final class VanishVelocityPlugin {
             initializationExecutor)
         .thenAccept(
             loaded -> {
-              if (closed.get()) {
-                return;
+              synchronized (lifecycleLock) {
+                if (closed.get()) {
+                  return;
+                }
+                if (!loaded.enabled()) {
+                  logger.log(
+                      Level.SEVERE,
+                      "Vanish state is corrupt; mutations and Redis publication are disabled. Backup: {0}",
+                      loaded.backupFile());
+                  return;
+                }
+                RedisVelocityService service =
+                    new RedisVelocityService(loaded.store(), loaded.config(), logger);
+                redisService = service;
+                service.start();
               }
-              if (!loaded.enabled()) {
-                logger.log(
-                    Level.SEVERE,
-                    "Vanish state is corrupt; mutations and Redis publication are disabled. Backup: {0}",
-                    loaded.backupFile());
-                return;
-              }
-              RedisVelocityService service =
-                  new RedisVelocityService(loaded.store(), loaded.config(), logger);
-              redisService = service;
-              service.start();
             })
         .exceptionally(
             failure -> {
@@ -79,15 +82,17 @@ public final class VanishVelocityPlugin {
               return null;
             });
   }
-
   @Subscribe
   public void onProxyShutdown(ProxyShutdownEvent event) {
-    if (!closed.compareAndSet(false, true)) {
-      return;
-    }
-    RedisVelocityService service = redisService;
-    if (service != null) {
-      service.close();
+    synchronized (lifecycleLock) {
+      if (!closed.compareAndSet(false, true)) {
+        return;
+      }
+      RedisVelocityService service = redisService;
+      redisService = null;
+      if (service != null) {
+        service.close();
+      }
     }
     initializationExecutor.shutdownNow();
   }

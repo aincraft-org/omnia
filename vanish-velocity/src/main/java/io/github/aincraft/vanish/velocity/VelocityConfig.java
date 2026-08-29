@@ -107,7 +107,13 @@ public record VelocityConfig(
       }
       values.put(key, value);
     }
-    String configuredStateFile = values.getOrDefault("state-file", "vanish-state.json");
+    String configuredStateFile = values.get("state-file");
+    if (configuredStateFile != null && configuredStateFile.isBlank()) {
+      throw new IllegalArgumentException("state-file must not be blank");
+    }
+    if (configuredStateFile == null) {
+      configuredStateFile = "vanish-state.json";
+    }
     Path stateFile = Path.of(configuredStateFile);
     if (!stateFile.isAbsolute()) {
       stateFile = dataDirectory.resolve(stateFile);

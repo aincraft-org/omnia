@@ -41,6 +41,22 @@ class RedisVelocityServiceTest {
   }
 
   @Test
+  void successfulConnectionCallbackRepairsSnapshotBeforeSubscriberDisconnects() {
+    FakeRedis redis = new FakeRedis();
+    VanishStateStore store = VanishStateStore.load(tempDir.resolve("state.json")).store();
+    RedisVelocityService service = service(redis, store);
+
+    service.start();
+    redis.operations.clear();
+    service.onRedisDisconnect(new IllegalStateException("connection dropped"));
+    service.onRedisConnected();
+
+    assertEquals(1, redis.operations.size());
+    assertTrue(redis.operations.get(0).startsWith("set:" + VanishMessages.SNAPSHOT_KEY));
+    assertTrue(service.redisAvailable());
+  }
+
+  @Test
   void idempotentDesiredStateDoesNotPublishDelta() {
     FakeRedis redis = new FakeRedis();
     VanishStateStore store = VanishStateStore.load(tempDir.resolve("state.json")).store();

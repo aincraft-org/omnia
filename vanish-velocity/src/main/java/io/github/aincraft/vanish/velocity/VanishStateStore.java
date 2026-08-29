@@ -86,6 +86,10 @@ public final class VanishStateStore {
       return new ChangeResult(ack, null, state);
     }
 
+    if (state.version() == Long.MAX_VALUE) {
+      return rejected(request, "State version exhausted");
+    }
+
     Set<UUID> vanished = new LinkedHashSet<>(state.vanished());
     if (request.vanished()) {
       vanished.add(request.playerId());
@@ -226,7 +230,7 @@ public final class VanishStateStore {
             StandardCopyOption.ATOMIC_MOVE,
             StandardCopyOption.REPLACE_EXISTING);
       } catch (AtomicMoveNotSupportedException unsupported) {
-        Files.move(temporary, absolute, StandardCopyOption.REPLACE_EXISTING);
+        throw new IOException("Atomic state replacement is unsupported", unsupported);
       }
       replaced = true;
     } finally {

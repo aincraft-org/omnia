@@ -21,6 +21,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.14.0")
     compileOnly("com.velocitypowered:velocity-api:4.1.1")
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
+    testCompileOnly("com.velocitypowered:velocity-api:4.1.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.3")
     implementation(project(":vanish-common"))
 }

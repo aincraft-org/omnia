@@ -322,14 +322,24 @@ public final class RedisVelocityService implements AutoCloseable {
   private void subscribeLoop() {
     while (running.get() && !closed.get()) {
       try {
-        redis.subscribe(this::onMessage, VanishMessages.REQUESTS_CHANNEL);
-        if (running.get() && !closed.get()) {
-          onRedisReconnect();
-        }
+        redis.subscribe(this::onMessage, this::onRedisConnected, VanishMessages.REQUESTS_CHANNEL);
       } catch (RuntimeException failure) {
         onRedisDisconnect(failure);
         sleepBeforeReconnect();
       }
+    }
+  }
+
+  void onRedisConnected() {
+    if (!closed.get()) {
+      onRedisReconnect()
+          .whenComplete(
+              (ignored, failure) -> {
+                if (failure != null) {
+                  logger.log(
+                      Level.WARNING, "Unable to repair the Redis vanish snapshot", unwrap(failure));
+                }
+              });
     }
   }
 
@@ -371,6 +381,10 @@ public final class RedisVelocityService implements AutoCloseable {
     long publish(String channel, String message);
 
     void subscribe(BiConsumer<String, String> receiver, String... channels);
+    default void subscribe(
+        BiConsumer<String, String> receiver, Runnable onConnected, String... channels) {
+      subscribe(receiver, channels);
+    }
 
     @Override
     void close();
@@ -404,9 +418,20 @@ public final class RedisVelocityService implements AutoCloseable {
 
     @Override
     public void subscribe(BiConsumer<String, String> receiver, String... channels) {
+      subscribe(receiver, () -> {}, channels);
+    }
+
+    @Override
+    public void subscribe(
+        BiConsumer<String, String> receiver, Runnable onConnected, String... channels) {
       try (Jedis connection = new Jedis(hostAndPort, jedisConfig)) {
         connection.subscribe(
             new JedisPubSub() {
+              @Override
+              public void onSubscribe(String channel, int subscribedChannels) {
+                onConnected.run();
+              }
+
               @Override
               public void onMessage(String channel, String message) {
                 receiver.accept(channel, message);
