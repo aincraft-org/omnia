@@ -258,7 +258,8 @@ Current isolated assessment:
 | `/vanish` acknowledgement and observer tab packet masking/restoration | PASS at observed packet level |
 | Entity hiding, no-flicker timing, and one-Paper-tick destination guarantee | NOT PROVEN; the probe observed a Target tab add followed immediately by removal |
 | Redis restart and subscriber resync | PASS in fixed follow-up; the initial run's ephemeral-key repair failure is retained in the detailed report |
-| Proxy JSON reload, permission see exemption/revocation, `/vservers`, and full offline/empty-backend matrix | BLOCKED; not exercised |
+| Empty backend reconciliation, `/vservers` filtering, and built-in `/server` guard | PASS in fixed follow-up; empty beta admitted Observer, `/vservers` returned `Servers: alpha, lobby`, and `/server beta` was unavailable while beta contained only vanished Target |
+| Proxy JSON reload, permission see exemption/revocation, and full backend-offline matrix | BLOCKED; not exercised |
 
 Detailed commands, logs, packet observations, client limitations, and cleanup proof are in `.superpowers/sdd/vanish-no-packet/live-runtime-report.md`. No FR-008, NMS, ProtocolLib, direct packet injection, permanent client dependency, or user-owned process change was introduced.
 
@@ -279,6 +280,6 @@ The fixed Velocity shadow jar used for the follow-up was SHA-256 `536614f9527aa5
 
 After the restart and delayed repair retry, the same `GET vanish:state:snapshot` value returned. Velocity logs recorded one failed repair attempt followed by the retry path; the key was present after the retry. This updates the reconnect result for the fixed artifact only; it does not claim Redis persistence across loss of the Redis process's own storage.
 
-The two-client rerun log is `/tmp/vanish-nopacket-live-20260829/node-client/live_vanish_rerun.log`. It used the current Paper jar and the fixed Velocity jar, connected offline `Target` and `Observer` through Velocity, observed both clients on alpha, target vanish acknowledgement plus observer `player_remove`, target alpha-to-beta arrival, target unvanish acknowledgement with `player_info action=29` on both clients, observer beta arrival, and a final target vanish with `player_remove` on both clients. The temporary parser emitted 26.1/26.2 schema-size warnings; only the explicitly listed packets are relied upon.
+The fixed-artifact follow-up also ran `/tmp/vanish-nopacket-live-20260829/node-client/empty_backend_probe.js`. Target vanished on alpha, Observer entered empty beta, Target later moved to beta, and Observer moved to lobby. `/vservers` returned `Servers: alpha, lobby` while beta contained only vanished Target; Observer's `/server beta` returned `That server is unavailable.` until Target unvanished, after which Observer entered beta and received Target's tab entry. The probe completed with `clients=2 firstLogins=2 events=70`. This proves empty-backend reconciliation, server-list filtering, and the built-in destination guard for the fixed artifact.
 
-The earlier limitations remain: the live probe did not isolate entity spawn/destroy packets, did not exercise proxy JSON reload, see-permission revocation, `/vservers`, or the full offline/empty-backend matrix, and does not establish a no-flicker or one-Paper-tick guarantee. No FR-008 packet/NMS/ProtocolLib implementation was added.
+The earlier limitations remain: the live probes did not isolate entity spawn/destroy packets, did not exercise proxy JSON reload, see-permission exemption/revocation, or backend-offline transitions, and do not establish a no-flicker or one-Paper-tick guarantee. No FR-008 packet/NMS/ProtocolLib implementation was added.

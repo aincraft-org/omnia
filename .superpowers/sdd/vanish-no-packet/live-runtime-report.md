@@ -148,8 +148,8 @@ This initial pre-fix run observed Redis TCP/subscriber reconnect, but durable sn
 | Redis restart and subscriber resync | PASS in fixed follow-up; initial pre-fix run was not a pass |
 | Proxy restart and JSON reload | BLOCKED; not exercised as a client scenario |
 | Permission see exemption/revocation | BLOCKED; not exercised |
-| `/vservers`/`/vanishservers` filtering | BLOCKED; not exercised |
-| Full matrix including backend offline/empty and no-leak timing | BLOCKED; not proven by this run |
+| `/vservers`/`/vanishservers` filtering | PASS in fixed follow-up; `/vservers` omitted the beta server containing only vanished Target |
+| Empty backend reconciliation and built-in `/server` guard | PASS in fixed follow-up; Observer entered empty beta while Target was vanished elsewhere, then `/vservers` omitted beta and `/server beta` returned `That server is unavailable.` |
 
 No FR-008 implementation or direct packet/NMS/ProtocolLib path was opened.
 
@@ -199,4 +199,17 @@ The fixed Redis reconnect check started the proxy with the prior durable state a
 
 Velocity logs recorded one failed repair attempt followed by the delayed retry. This proves reconnect repair for the current artifact; it does not claim Redis can retain a key after its own storage is destroyed.
 
-The original required-port run and the first ephemeral Redis restart failure remain preserved as historical evidence. Proxy JSON reload, permission see exemption/revocation, `/vservers`/`/vanishservers`, backend-offline/empty cases, and the full no-leak timing matrix remain unexercised. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
+The original required-port run and the first ephemeral Redis restart failure remain preserved as historical evidence. Backend-offline transitions, permission see exemption/revocation, proxy JSON reload, and the full no-leak timing matrix remain unexercised. The fixed follow-up now covers empty-backend reconciliation, `/vservers` filtering, and the built-in `/server` guard. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
+
+## Fixed-artifact empty-backend and server-filter follow-up
+
+A third task-owned run used the same fixed artifacts and ports as the reconnect follow-up: proxy `28176`, lobby `38171`, alpha `38169`, beta `38170`, and Redis `16380`. The temporary client probe was `/tmp/vanish-nopacket-live-20260829/node-client/empty_backend_probe.js`; its output is `/tmp/vanish-nopacket-live-20260829/node-client/empty_backend_probe.log`.
+
+Selected observations:
+
+1. Target vanished on alpha at `18.151s`. Observer then requested `/server beta` at `23.152s` while beta was empty and Target remained on alpha; Observer reached beta's play login at `23.744s`. This proves a backend can reconcile the already-vanished state when the first non-vanished viewer arrives.
+2. Target requested `/server beta` at `28.151s`. Observer received the target tab add at `28.225s` followed by `player_remove` at `28.658s`, matching the target's vanished state after the cross-backend arrival.
+3. Observer moved to empty lobby at `34.152s` and requested `/vservers` at `38.151s`; the proxy returned `Servers: alpha, lobby` at `38.155s`, omitting beta because it contained only the vanished Target.
+4. Observer requested `/server beta` at `42.151s`; Velocity returned `That server is unavailable.` at `42.152s`. After Target unvanished on beta at `46.151s`, both clients received `player_info action=29` at `46.160s`/`46.161s`; Observer's `/server beta` at `48.151s` then reached beta login at `48.221s` and received Target's tab entry at `48.222s`.
+
+The probe completed with `clients=2 firstLogins=2 events=70`. This adds direct evidence for empty-backend reconciliation, `/vservers` filtering, and the built-in server guard. Backend-offline transitions, permission exemption/revocation, proxy JSON reload, and no-leak timing remain unexercised. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
