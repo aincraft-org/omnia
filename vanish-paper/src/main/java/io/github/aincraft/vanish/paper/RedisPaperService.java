@@ -500,6 +500,11 @@ public final class RedisPaperService implements VanishTransport {
       }
       return;
     }
+    subscriberExecutor.shutdownNow();
+    if (ownedOperationExecutor != null) {
+      ownedOperationExecutor.shutdownNow();
+    }
+    pool.close();
     if (closeRetryExecutor) {
       retryExecutor.shutdownNow();
     }

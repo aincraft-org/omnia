@@ -197,6 +197,20 @@ class RedisPaperServiceTest {
     assertFalse(manager.isVanished(TARGET));
   }
 
+
+  @Test
+  void closeCancelsPendingRequestsAndClosesInjectedTransport() {
+    FakeTransport transport = new FakeTransport();
+    RedisPaperService service = service(manager(), transport, Duration.ofSeconds(1));
+    CompletionStage<ChangeAck> pending =
+        service.requestChange(
+            new ChangeRequest(UUID.randomUUID(), TARGET, true));
+
+    service.close();
+
+    assertTrue(pending.toCompletableFuture().isCompletedExceptionally());
+    assertTrue(transport.closed);
+  }
   private RedisPaperService service(
       VanishManager manager, FakeTransport transport, Duration timeout) {
     return new RedisPaperService(manager, transport, scheduler, timeout, "test-backend");
@@ -215,6 +229,7 @@ class RedisPaperServiceTest {
     private CompletableFuture<Void> snapshotRequestCompletion =
         CompletableFuture.completedFuture(null);
     private final java.util.ArrayList<SnapshotRequest> snapshotRequests = new java.util.ArrayList<>();
+    private boolean closed;
 
     @Override
     public CompletionStage<VanishState> readSnapshot() {
@@ -234,6 +249,8 @@ class RedisPaperServiceTest {
     }
 
     @Override
-    public void close() {}
+    public void close() {
+      closed = true;
+    }
   }
 }
