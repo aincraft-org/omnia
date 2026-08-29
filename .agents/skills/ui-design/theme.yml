@@ -1,0 +1,54 @@
+# Canonical reference format and safe starting defaults for the ui-design skill.
+#
+# How to use this file:
+# 1. To adopt: copy it to the project's resource/config location (commonly
+#    src/main/resources/theme.yml) and adjust colors/materials to the project palette.
+# 2. Load it exactly once during plugin startup. Validate: version supported,
+#    every color is #RRGGBB, every weight is regular|bold, every material
+#    resolves to a Bukkit Material. Reject invalid values and fail startup.
+# 3. Freeze the validated result into one immutable UiTheme object and pass it
+#    to renderers. Renderers resolve tokens/materials at build time; handlers
+#    must never hardcode hex codes or materials anywhere else.
+# 4. Keep player copy and MiniMessage templates in messages.yml, separate from
+#    these presentation tokens.
+#
+# This file is optional: it is an implementation guide, not a required runtime
+# contract. Projects without an adopted theme keep their existing palette and
+# use the roles below as guidance — same role, same meaning, on every screen.
+
+version: 1
+
+tokens:
+  title:            # GUI/section headers, titles
+    color: "#FFAA00"
+    weight: bold
+  money:            # currency, prices, numeric values
+    color: "#FFAA00"
+    weight: regular
+  body:             # default player-facing text
+    color: "#FFFFFF"
+    weight: regular
+  muted:            # hints, secondary info, timestamps
+    color: "#AAAAAA"
+    weight: regular
+  accent:           # interactive emphasis, focus indicators
+    color: "#55FFFF"
+    weight: regular
+  success:          # successful outcomes
+    color: "#55FF55"
+    weight: regular
+  warning:          # warnings, caution
+    color: "#FFFF55"
+    weight: regular
+  danger:           # errors, destructive actions
+    color: "#FF5555"
+    weight: regular
+  border:           # frame borders, dividers, separators
+    color: "#AAAAAA"
+    weight: regular
+
+materials:
+  filler: GRAY_STAINED_GLASS_PANE   # empty slots on every screen
+  back: ARROW                       # navigation slot 45 (54-slot GUI)
+  close: BARRIER                    # navigation slot 49
+  next: ARROW                       # navigation slot 53

@@ -1,0 +1,68 @@
+---
+title: Economy (Mint)
+description: "How Credits work: the ledger, the basics, and what they mean for you."
+---
+
+{/*
+  Floor-to-ceiling template. Five levels, in order, each labelled.
+  Quote the description whenever it contains a colon.
+  Replace the Minecraft-economy example with your own feature; for a library,
+  the same ladder reads: what it is, install, the everyday call, extension
+  points, gotchas.
+*/}
+
+## The idea: money on a ledger
+
+The server's economy is a **ledger**: a permanent, ordered record of Credits
+moving between accounts. A coin is not an item you carry; it is a line in that
+record saying an account holds some amount. Because the ledger is the ground
+truth, your balance survives restarts and every payout is recorded.
+
+No commands yet — this section only has to leave the reader with the concept.
+
+## The basics: what you need on day one
+
+Credits are the server's currency, shown with the symbol ¢ and two decimal
+places. Your balance is the amount you can spend right now.
+
+Assume no prior knowledge here. Everything above the commands must make sense
+to someone who has never heard of the feature.
+
+## Everyday: what you can do
+
+Two commands cover most of what you need. `/mint balance` shows your available
+Credits, and `/mint pay <player> <amount> [reason]` sends Credits to another
+player, with the optional reason showing up in the receipt you both see.
+
+Commands live inside sentences that say when and why to reach for them. Most
+readers stop at this level, so it must stand on its own.
+
+<Callout type="info">
+  Advanced — you do not need this to get started.
+</Callout>
+
+## Advanced: transactions, holds, and virtual accounts
+
+A transaction is the formal unit the ledger records: a debit, a matching
+credit, and a receipt. Other plugins reserve funds with a hold before a trade
+settles, and some accounts belong to systems rather than players.
+
+Be honest about which parts a player drives and which are machinery running on
+their behalf. Never let this material drift up into the basics.
+
+## What it means for you
+
+Balances are authoritative, so a payout that does not appear in
+`/mint history` did not happen — ask an operator rather than paying twice.
+
+Close with practical advice and the surprises worth warning about.
+
+## Command reference
+
+A cheat sheet is fine here, at the end, after the explanation has done its job.
+
+| Command | What it does |
+| --- | --- |
+| `/mint balance` | Show your available Credits |
+| `/mint pay <player> <amount> [reason]` | Send Credits, with an optional note |
+| `/mint history [limit]` | List recent transactions (10 by default, up to 25) |
