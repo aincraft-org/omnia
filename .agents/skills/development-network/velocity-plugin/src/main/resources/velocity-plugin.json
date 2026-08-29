@@ -2,7 +2,7 @@
   "id": "proxy-inspector",
   "name": "Proxy Inspector",
   "version": "${version}",
-  "description": "Lists proxy servers and plugins and grants DEV_USERS explicit Velocity admin permissions",
+  "description": "Dependency-free proxy moderation, routing, lookup, messaging, and broadcast commands; grants DEV_USERS explicit admin permissions",
   "authors": ["aincraft"],
   "main": "io.github.aincraft.proxyinspector.ProxyInspectorPlugin"
 }

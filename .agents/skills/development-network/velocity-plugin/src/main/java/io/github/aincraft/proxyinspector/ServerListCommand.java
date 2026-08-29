@@ -101,6 +101,10 @@ final class ServerListCommand implements SimpleCommand {
     }
 
     @Override
+    public boolean hasPermission(Invocation invocation) {
+        return invocation.source().hasPermission("velocity.command.glist");
+    }
+    @Override
     public List<String> suggest(Invocation invocation) {
         return List.of();
     }

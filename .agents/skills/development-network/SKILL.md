@@ -148,10 +148,18 @@ It registers:
   counts, the names in each group, endpoints, and connected-player count.
 - `/plugins` (alias `/pluginlist`) — lists the plugins loaded by the Velocity proxy, including their IDs and
   versions.
+- Moderation — `/kick`, `/kickall`, `/ban`, `/tempban`, `/unban`, `/banip`, `/ipban`, `/tempbanip`, `/unbanip`,
+  `/unipban`, and `/warn`.
+- Lookup — `/find` (`/locate`), `/whois` (`/playerinfo`, `/pinfo`), `/seen`, `/ping`, and `/list`
+  (`/who`, `/online`).
+- Messaging — `/msg` (`/tell`, `/w`, `/whisper`, `/pm`) and `/reply` (`/r`).
+- Broadcast — `/broadcast` (`/bc`, `/announce`).
 
-The plugin leaves Velocity's built-in `/server <name>` command untouched. These commands inspect the proxy only:
-Velocity cannot discover the plugin list of a Paper backend without a separate backend plugin and reporting
-protocol. Restart the proxy after installing or updating the jar.
+The plugin leaves Velocity's built-in `/server <name>` and `/send <player> <server>` commands untouched. It grants
+`DEV_USERS` `proxyins.command.*` plus the existing `velocity.command.send` permission. The new punishment state is
+in-memory and dependency-free. `/mute` and `/unmute` are deliberately not registered: modern Velocity chat denial
+disconnects players instead of providing reliable silent suppression. Homes, warps, spawn, teleport/TPA, economy,
+kits, mail, inventory, gamemode, and other world operations require a Paper-side component.
 
 ## Runtime registration (hot-add backends, no proxy restart)
 
@@ -362,11 +370,12 @@ Each backend is OFFLINE mode, so ops use the **name-derived offline UUID** — t
 **Velocity has no OP state.** It uses permission nodes, while Paper backends use `ops.json`. Backend `*`/op does
 not carry to the proxy.
 
-When the Proxy Inspector jar is installed on the proxy, every username in `DEV_USERS` receives these explicit
-Velocity nodes: `velocity.command.*`, `velocity.command.info`, `velocity.command.plugins`,
-`velocity.command.reload`, `velocity.command.dump`, `velocity.command.heap`, `velocity.command.glist`, and
-`velocity.command.send`. `velocity.command.*` is included because Velocity's built-in admin command uses that
-node; unlisted players retain Velocity's default permissions. `runProxy`/`dev-network.sh` passes `DEV_USERS` to
+When the Proxy Inspector jar is installed on the proxy, every username in `DEV_USERS` receives `proxyins.command.*`
+for the dependency-free moderation, lookup, messaging, and broadcast suite, plus these explicit Velocity nodes:
+`velocity.command.*`, `velocity.command.info`, `velocity.command.plugins`, `velocity.command.reload`, `velocity.command.dump`,
+`velocity.command.heap`, `velocity.command.glist`, and `velocity.command.send`. Each command also accepts its
+specific `proxyins.command.<name>` node. `velocity.command.*` is included because Velocity's built-in admin command
+uses that node; unlisted players retain their normal permissions. `runProxy`/`dev-network.sh` passes `DEV_USERS` to
 the proxy, and managed backends receive the same users through `write-ops.sh`:
 
 ```bash

@@ -44,6 +44,10 @@ final class PluginListCommand implements SimpleCommand {
     }
 
     @Override
+    public boolean hasPermission(Invocation invocation) {
+        return invocation.source().hasPermission("velocity.command.plugins");
+    }
+    @Override
     public List<String> suggest(Invocation invocation) {
         return List.of();
     }

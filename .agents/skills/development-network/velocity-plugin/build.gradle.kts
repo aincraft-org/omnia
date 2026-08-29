@@ -30,6 +30,31 @@ dependencies {
     compileOnly("com.velocitypowered:velocity-api:4.1.1")
 }
 
+val contractTest = sourceSets.create("contractTest") {
+    java.srcDir("src/contractTest/java")
+}
+
+configurations["contractTestImplementation"].extendsFrom(configurations.compileOnly.get())
+contractTest.compileClasspath += sourceSets.main.get().output
+contractTest.runtimeClasspath += sourceSets.main.get().output
+
+tasks.register<JavaExec>("contractTest") {
+    dependsOn(contractTest.classesTaskName)
+    classpath = contractTest.runtimeClasspath
+    mainClass.set(providers.gradleProperty("contractTestClass"))
+}
+
+tasks.register<JavaExec>("contractTestSuite") {
+    dependsOn(contractTest.classesTaskName)
+    classpath = contractTest.runtimeClasspath
+    mainClass.set("io.github.aincraft.proxyinspector.ContractTestSuite")
+}
+
+tasks.named("check") {
+    dependsOn("contractTestSuite")
+}
+
+
 tasks.processResources {
     filesMatching("velocity-plugin.json") {
         expand("version" to project.version)

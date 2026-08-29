@@ -50,10 +50,20 @@ cp velocity-plugin/build/libs/proxy-inspector-*.jar /path/to/velocity/plugins/
 Commands:
 
 - `/servers` or `/serverlist` — asynchronously pings every registered server, then reports online/offline counts, names in each group, endpoints, and player counts.
-- `/plugins` or `/pluginlist` — plugins loaded by the Velocity proxy, with IDs and versions.
+- `/plugins` or `/pluginlist` — lists the plugins loaded by the Velocity proxy, with IDs and versions.
+- Moderation — `/kick`, `/kickall`, `/ban`, `/tempban`, `/unban`, `/banip`, `/ipban`, `/tempbanip`, `/unbanip`, `/unipban`, and `/warn`.
+- Routing — Velocity's built-in `/send <player> <server>` remains available; Proxy Inspector grants its existing `velocity.command.send` permission.
+- Lookup — `/find` (`/locate`), `/whois` (`/playerinfo`, `/pinfo`), `/seen`, `/ping`, and `/list` (`/who`, `/online`).
+- Messaging — `/msg` (`/tell`, `/w`, `/whisper`, `/pm`) and `/reply` (`/r`).
+- Broadcast — `/broadcast` (`/bc`, `/announce`).
 
-When the proxy starts with `DEV_USERS='name'`, Proxy Inspector grants those usernames the explicit Velocity
-admin nodes `velocity.command.*`, `velocity.command.info`, `velocity.command.plugins`, `velocity.command.reload`,
+The command suite is proxy-compatible and dependency-free: `velocity-api:4.1.1` remains the only declared dependency, and
+punishments, last-seen records, and reply state are in-memory. `/mute` and `/unmute` are not registered because
+Velocity's modern chat denial disconnects the player rather than providing a reliable silent mute. Homes, warps,
+teleportation, economy, kits, mail, inventory, gamemode, and other world operations require a Paper-side component.
+
+When the proxy starts with `DEV_USERS='name'`, Proxy Inspector grants those usernames `proxyins.command.*` plus the
+explicit Velocity admin nodes `velocity.command.*`, `velocity.command.info`, `velocity.command.plugins`, `velocity.command.reload`,
 `velocity.command.dump`, `velocity.command.heap`, `velocity.command.glist`, and `velocity.command.send`.
 Managed Paper backends receive the same users through `ops.json`. External Paper servers are not modified; run
 `/op name` or configure their permission plugin separately. This grant is for the local development harness only.
