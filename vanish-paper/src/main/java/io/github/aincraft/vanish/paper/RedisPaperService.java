@@ -57,6 +57,7 @@ public final class RedisPaperService implements VanishTransport {
   private final Object lifecycleLock = new Object();
   private final Object stateLock = new Object();
   private final CompletableFuture<Void> subscriptionReady = new CompletableFuture<>();
+  private volatile CompletableFuture<VanishState> snapshotReconciliation;
   private final AtomicBoolean snapshotRequestInFlight = new AtomicBoolean();
   private final AtomicBoolean closed = new AtomicBoolean();
   private volatile boolean running;
@@ -158,22 +159,28 @@ public final class RedisPaperService implements VanishTransport {
     readSnapshot()
         .whenComplete(
             (state, error) -> {
-              if (error == null && state != null && validSnapshot) {
+              if (error == null && state != null && validSnapshot && !hasPendingGap()) {
                 resetRetryDelay();
                 result.complete(state);
                 return;
               }
-              if (validSnapshot) {
-                result.complete(manager.snapshot());
+              if (error != null && delegate == null && running && !subscriptionReady.isDone()) {
+                result.completeExceptionally(unwrap(error));
                 scheduleRetry();
                 return;
               }
               requestSnapshotForReconciliation()
                   .whenComplete(
                       (snapshot, snapshotError) -> {
-                        if (snapshotError == null && snapshot != null && validSnapshot) {
+                        if (snapshotError == null
+                            && snapshot != null
+                            && validSnapshot
+                            && !hasPendingGap()) {
                           resetRetryDelay();
                           result.complete(snapshot);
+                        } else if (validSnapshot && !hasPendingGap()) {
+                          result.complete(manager.snapshot());
+                          scheduleRetry();
                         } else {
                           Throwable cause = unwrap(snapshotError == null ? error : snapshotError);
                           result.completeExceptionally(
@@ -223,8 +230,8 @@ public final class RedisPaperService implements VanishTransport {
       if (snapshot.version() < current.version()) {
         return;
       }
-      validSnapshot = true;
       manager.applySnapshot(snapshot);
+      validSnapshot = true;
       gap = drainQueuedDeltas();
     }
     if (gap) {
@@ -272,6 +279,12 @@ public final class RedisPaperService implements VanishTransport {
     return gap;
   }
 
+  private boolean hasPendingGap() {
+    synchronized (stateLock) {
+      return !queuedDeltas.isEmpty();
+    }
+  }
+
 
   /** Completes a pending change only when the acknowledgement request ID matches. */
   public void onChangeAck(ChangeAck ack) {
@@ -298,7 +311,10 @@ public final class RedisPaperService implements VanishTransport {
       return failedStage(new CancellationException("Redis Paper service is closed"));
     }
     if (delegate == null && running && !subscriptionReady.isDone()) {
-      return subscriptionReady.thenCompose(ignored -> readSnapshot());
+      return subscriptionReady
+          .copy()
+          .orTimeout(config.requestTimeoutMillis(), TimeUnit.MILLISECONDS)
+          .thenCompose(ignored -> readSnapshot());
     }
     if (delegate != null) {
       CompletionStage<VanishState> stage;
@@ -316,7 +332,7 @@ public final class RedisPaperService implements VanishTransport {
               throw new IllegalStateException("Transport returned no snapshot");
             }
             onStateSnapshot(state);
-            return state;
+            return manager.snapshot();
           });
     }
     return CompletableFuture.<VanishState>supplyAsync(
@@ -333,7 +349,7 @@ public final class RedisPaperService implements VanishTransport {
         .thenApply(
             state -> {
               onStateSnapshot(state);
-              return state;
+              return manager.snapshot();
             });
   }
 
@@ -484,11 +500,6 @@ public final class RedisPaperService implements VanishTransport {
       }
       return;
     }
-    subscriberExecutor.shutdownNow();
-    if (ownedOperationExecutor != null) {
-      ownedOperationExecutor.shutdownNow();
-    }
-    pool.close();
     if (closeRetryExecutor) {
       retryExecutor.shutdownNow();
     }
@@ -501,6 +512,7 @@ public final class RedisPaperService implements VanishTransport {
     public void onSubscribe(String channel, int subscribed) {
       subscribedChannels = Math.max(subscribedChannels, subscribed);
       if (subscribedChannels >= 2) {
+        retryDelayMillis = config.retryInitialMillis();
         onSubscriptionReady();
       }
     }
@@ -534,7 +546,6 @@ public final class RedisPaperService implements VanishTransport {
       boolean subscribed = false;
       try (Jedis connection = new Jedis(hostAndPort, jedisConfig)) {
         subscriber = connection;
-        retryDelayMillis = config.retryInitialMillis();
         connection.subscribe(
             new Subscriber(), VanishMessages.EVENTS_CHANNEL, VanishMessages.RESPONSES_CHANNEL);
         subscribed = true;
@@ -554,7 +565,7 @@ public final class RedisPaperService implements VanishTransport {
 
   private void sleepBeforeReconnect() {
     long delay = retryDelayMillis;
-    retryDelayMillis = Math.min(config.retryMaxMillis(), Math.max(delay, delay * 2));
+    advanceRetryBackoff();
     try {
       Thread.sleep(delay);
     } catch (InterruptedException interrupted) {
@@ -562,25 +573,42 @@ public final class RedisPaperService implements VanishTransport {
     }
   }
 
+  void advanceRetryBackoff() {
+    long max = config == null ? RedisConfig.DEFAULT_RETRY_MAX_MILLIS : config.retryMaxMillis();
+    retryDelayMillis = Math.min(max, Math.max(retryDelayMillis, retryDelayMillis * 2));
+  }
+
+  long currentRetryDelayMillis() {
+    return retryDelayMillis;
+  }
+
 
   private CompletionStage<VanishState> requestSnapshotForReconciliation() {
-    if (!snapshotRequestInFlight.compareAndSet(false, true)) {
-      return CompletableFuture.completedFuture(validSnapshot ? manager.snapshot() : null);
+    CompletableFuture<VanishState> result;
+    synchronized (snapshotRequestInFlight) {
+      if (snapshotRequestInFlight.get()) {
+        return snapshotReconciliation;
+      }
+      snapshotRequestInFlight.set(true);
+      result = new CompletableFuture<>();
+      snapshotReconciliation = result;
     }
     SnapshotRequest request = new SnapshotRequest(UUID.randomUUID(), backendId);
-    CompletableFuture<VanishState> result = new CompletableFuture<>();
     requestSnapshot(request)
         .whenComplete(
             (ignored, error) -> {
-              snapshotRequestInFlight.set(false);
+              synchronized (snapshotRequestInFlight) {
+                snapshotRequestInFlight.set(false);
+                snapshotReconciliation = null;
+              }
               if (error != null) {
                 result.completeExceptionally(unwrap(error));
                 scheduleRetry();
-              } else if (validSnapshot) {
+              } else if (validSnapshot && !hasPendingGap()) {
                 result.complete(manager.snapshot());
               } else {
                 result.completeExceptionally(
-                    new IllegalStateException("Snapshot response did not contain valid state"));
+                    new IllegalStateException("Snapshot response did not resolve state gap"));
               }
             });
     return result;

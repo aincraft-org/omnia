@@ -92,6 +92,74 @@ class RedisPaperServiceTest {
   }
 
   @Test
+  void reconnectBackoffDoublesAndCapsAtThirtySeconds() {
+    RedisPaperService service = service(manager(), new FakeTransport(), Duration.ofSeconds(1));
+
+    service.advanceRetryBackoff();
+    service.advanceRetryBackoff();
+    assertEquals(2_000L, service.currentRetryDelayMillis());
+    for (int attempt = 0; attempt < 20; attempt++) {
+      service.advanceRetryBackoff();
+    }
+    assertEquals(RedisConfig.DEFAULT_RETRY_MAX_MILLIS, service.currentRetryDelayMillis());
+  }
+
+  @Test
+  void noCachePreLoginReconciliationFailsClosed() {
+    FakeTransport transport = new FakeTransport();
+    transport.snapshot.completeExceptionally(new IllegalStateException("offline"));
+    transport.snapshotRequestCompletion.completeExceptionally(new IllegalStateException("offline"));
+    RedisPaperService service = service(manager(), transport, Duration.ofSeconds(1));
+
+    CompletionException failure =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            CompletionException.class, () -> service.reconcileForPreLogin().toCompletableFuture().join());
+
+    assertNotNull(failure.getCause());
+    assertEquals(1, transport.snapshotRequests.size());
+  }
+
+  @Test
+  void cachedJoinStateIsReturnedWhenRedisIsDownAndSnapshotIsRequested() {
+    FakeTransport transport = new FakeTransport();
+    RedisPaperService service = service(manager(), transport, Duration.ofSeconds(1));
+    VanishState cached = new VanishState(3, Set.of(TARGET));
+    service.onStateSnapshot(cached);
+    transport.snapshot.completeExceptionally(new IllegalStateException("offline"));
+
+    assertEquals(cached, service.reconcileForJoin().toCompletableFuture().join());
+    assertEquals(1, transport.snapshotRequests.size());
+  }
+
+  @Test
+  void queuedGapBlocksJoinUntilSufficientSnapshotArrives() {
+    FakeTransport transport = new FakeTransport();
+    RedisPaperService service = service(manager(), transport, Duration.ofSeconds(1));
+    service.onStateSnapshot(new VanishState(1, Set.of()));
+    service.onStateDelta(new StateDelta(3, TARGET, true));
+    transport.snapshot = CompletableFuture.completedFuture(new VanishState(1, Set.of()));
+    transport.snapshotRequestCompletion = new CompletableFuture<>();
+
+    CompletableFuture<VanishState> join = service.reconcileForJoin().toCompletableFuture();
+    assertFalse(join.isDone());
+    service.onStateSnapshot(new VanishState(3, Set.of(TARGET)));
+    transport.snapshotRequestCompletion.complete(null);
+
+    assertEquals(new VanishState(3, Set.of(TARGET)), join.join());
+  }
+
+  @Test
+  void staleGetReturnsLatestAcceptedState() {
+    FakeTransport transport = new FakeTransport();
+    RedisPaperService service = service(manager(), transport, Duration.ofSeconds(1));
+    VanishState current = new VanishState(4, Set.of(TARGET));
+    service.onStateSnapshot(current);
+    transport.snapshot = CompletableFuture.completedFuture(new VanishState(2, Set.of()));
+
+    assertEquals(current, service.readSnapshot().toCompletableFuture().join());
+  }
+
+  @Test
   void rejectionAndTimeoutNeverMutateLocalState() {
     FakeTransport transport = new FakeTransport();
     VanishManager manager = manager();
@@ -144,6 +212,8 @@ class RedisPaperServiceTest {
     private int readSnapshotCalls;
     private CompletableFuture<VanishState> snapshot = new CompletableFuture<>();
     private CompletableFuture<ChangeAck> change = new CompletableFuture<>();
+    private CompletableFuture<Void> snapshotRequestCompletion =
+        CompletableFuture.completedFuture(null);
     private final java.util.ArrayList<SnapshotRequest> snapshotRequests = new java.util.ArrayList<>();
 
     @Override
@@ -160,7 +230,7 @@ class RedisPaperServiceTest {
     @Override
     public CompletionStage<Void> requestSnapshot(SnapshotRequest request) {
       snapshotRequests.add(request);
-      return CompletableFuture.completedFuture(null);
+      return snapshotRequestCompletion;
     }
 
     @Override
