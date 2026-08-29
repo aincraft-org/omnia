@@ -17,7 +17,6 @@ permissions:
     description: Allows administrative vanish operations.
     default: op
 commands:
-  vanishpoc:
-    description: Temporary Paper API-only visibility proof of concept.
-    usage: /vanishpoc <on|off> <exact-player-name>
-    permission: vanish.admin
+  vanish:
+    description: Toggle a player's authoritative vanish state.
+    usage: /vanish [player|status]

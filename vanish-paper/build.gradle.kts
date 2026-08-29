@@ -20,6 +20,12 @@ java {
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.2.build.+")
     implementation(project(":vanish-common"))
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.3")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 checkstyle {

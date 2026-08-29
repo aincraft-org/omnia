@@ -5,15 +5,38 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 /** Paper entrypoint for the vanish backend. */
 public final class VanishPaperPlugin extends JavaPlugin {
+  private VanishManager manager;
+  private PlayerListener listener;
+
   @Override
   public void onEnable() {
-    PocListener listener = new PocListener(this);
+    manager = new VanishManager(this);
+    listener = new PlayerListener(this, manager);
     getServer().getPluginManager().registerEvents(listener, this);
-    PluginCommand command = getCommand("vanishpoc");
+    listener.start();
+
+    PluginCommand command = getCommand("vanish");
     if (command == null) {
-      getLogger().severe("Missing vanishpoc command declaration");
+      getLogger().severe("Missing vanish command declaration");
       return;
     }
-    command.setExecutor(new PocCommand(listener));
+    command.setExecutor(new VanishCommand(this, this::findTransport));
+  }
+
+  @Override
+  public void onDisable() {
+    if (listener != null) {
+      listener.stop();
+    }
+  }
+
+  /** Exposes the Paper-side state manager to the transport integration. */
+  public VanishManager getVanishManager() {
+    return manager;
+  }
+
+  private VanishTransport findTransport() {
+    var registration = getServer().getServicesManager().getRegistration(VanishTransport.class);
+    return registration == null ? null : registration.getProvider();
   }
 }
