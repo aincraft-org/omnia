@@ -4,9 +4,13 @@ import io.github.aincraft.vanish.common.ChangeAck;
 import io.github.aincraft.vanish.common.ChangeRequest;
 import io.github.aincraft.vanish.common.SnapshotRequest;
 import io.github.aincraft.vanish.common.SnapshotResponse;
+import io.github.aincraft.vanish.common.StateDelta;
 import io.github.aincraft.vanish.common.VanishMessages;
 import io.github.aincraft.vanish.common.VanishState;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -33,7 +37,9 @@ import redis.clients.jedis.JedisPubSub;
   "PMD.AvoidCatchingGenericException",
   "PMD.AvoidDuplicateLiterals",
   "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.CloseResource"
+  "PMD.CloseResource",
+  "PMD.CompareObjectsWithEquals",
+  "PMD.NullAssignment"
 })
 public final class RedisVelocityService implements AutoCloseable {
   private final VanishStateStore store;
@@ -48,6 +54,7 @@ public final class RedisVelocityService implements AutoCloseable {
   private final AtomicBoolean running = new AtomicBoolean();
   private final CopyOnWriteArrayList<Consumer<VanishState>> stateListeners =
       new CopyOnWriteArrayList<>();
+  private final Deque<PendingPublication> pendingPublications = new ArrayDeque<>();
   private volatile boolean redisAvailable;
 
   /** Creates the production Jedis-backed authority. */
@@ -72,23 +79,31 @@ public final class RedisVelocityService implements AutoCloseable {
 
   /** Creates an executor-backed service around an injected Redis client for deterministic tests. */
   RedisVelocityService(VanishStateStore store, RedisClient redis, Executor operationExecutor) {
+    this(store, redis, operationExecutor, null);
+  }
+
+  RedisVelocityService(
+      VanishStateStore store,
+      RedisClient redis,
+      Executor operationExecutor,
+      ExecutorService subscriberExecutor) {
     this.store = Objects.requireNonNull(store, "store");
     this.config = null;
     this.logger = Logger.getLogger(RedisVelocityService.class.getName());
     this.redis = Objects.requireNonNull(redis, "redis");
     this.operationExecutor = Objects.requireNonNull(operationExecutor, "operationExecutor");
     this.ownedOperationExecutor = null;
-    this.subscriberExecutor = null;
+    this.subscriberExecutor = subscriberExecutor;
     this.closeExecutors = false;
     this.redisAvailable = true;
   }
 
-  /** Starts durable-key reconciliation and the blocking Redis request subscriber. */
+  /** Starts durable-key reconciliation before the blocking Redis request subscriber. */
   public void start() {
     if (closed.get() || !running.compareAndSet(false, true)) {
       return;
     }
-    rewriteDurableSnapshot()
+    rewriteDurableSnapshot(true)
         .whenComplete(
             (ignored, failure) -> {
               if (failure != null) {
@@ -97,10 +112,10 @@ public final class RedisVelocityService implements AutoCloseable {
                     "Unable to publish the initial vanish snapshot",
                     unwrap(failure));
               }
+              if (!closed.get() && subscriberExecutor != null) {
+                subscriberExecutor.execute(this::subscribeLoop);
+              }
             });
-    if (subscriberExecutor != null) {
-      subscriberExecutor.execute(this::subscribeLoop);
-    }
   }
 
   /** Returns the current valid in-memory state without performing I/O. */
@@ -155,6 +170,21 @@ public final class RedisVelocityService implements AutoCloseable {
                     "State store is disabled"));
             return;
           }
+          if (!pendingPublications.isEmpty()) {
+            try {
+              publishPendingPublications();
+              redisAvailable = true;
+            } catch (RuntimeException failure) {
+              redisAvailable = false;
+              result.complete(
+                  new ChangeAck(
+                      request.requestId(),
+                      false,
+                      store.snapshot().version(),
+                      "Redis publication failed: " + message(failure)));
+              return;
+            }
+          }
           if (!redisAvailable) {
             result.complete(
                 new ChangeAck(
@@ -175,11 +205,11 @@ public final class RedisVelocityService implements AutoCloseable {
           }
           notifyStateListeners(change.snapshot());
           try {
-            redis.set(VanishMessages.SNAPSHOT_KEY, VanishMessages.encode(change.snapshot()));
-            redis.publish(VanishMessages.EVENTS_CHANNEL, VanishMessages.encode(change.delta()));
+            publishMutation(change.snapshot(), change.delta());
             redis.publish(VanishMessages.RESPONSES_CHANNEL, VanishMessages.encode(change.ack()));
             result.complete(change.ack());
           } catch (RuntimeException failure) {
+            pendingPublications.addLast(new PendingPublication(change.snapshot(), change.delta()));
             redisAvailable = false;
             result.complete(
                 new ChangeAck(
@@ -262,7 +292,7 @@ public final class RedisVelocityService implements AutoCloseable {
               throw new IllegalStateException("Redis snapshot key is missing");
             }
             VanishState remote = VanishMessages.decodeVanishState(encoded);
-            redisAvailable = true;
+            redisAvailable = pendingPublications.isEmpty();
             result.complete(remote);
           } catch (RuntimeException failure) {
             redisAvailable = false;
@@ -273,9 +303,9 @@ public final class RedisVelocityService implements AutoCloseable {
     return result;
   }
 
-  /** Rewrites the durable key after startup or a Redis reconnect. */
+  /** Rewrites and announces the durable key after startup or a Redis reconnect. */
   public CompletionStage<Void> onRedisReconnect() {
-    return rewriteDurableSnapshot();
+    return rewriteDurableSnapshot(true);
   }
 
   /** Decodes a Redis request message and dispatches it without doing blocking work inline. */
@@ -318,6 +348,12 @@ public final class RedisVelocityService implements AutoCloseable {
     running.set(false);
     redisAvailable = false;
     stateListeners.clear();
+    pendingPublications.clear();
+    try {
+      redis.closeSubscription();
+    } catch (RuntimeException failure) {
+      logger.log(Level.FINE, "Error closing Redis subscription", failure);
+    }
     try {
       redis.close();
     } catch (RuntimeException failure) {
@@ -331,7 +367,7 @@ public final class RedisVelocityService implements AutoCloseable {
     }
   }
 
-  private CompletionStage<Void> rewriteDurableSnapshot() {
+  private CompletionStage<Void> rewriteDurableSnapshot(boolean announceSnapshot) {
     CompletableFuture<Void> result = new CompletableFuture<>();
     enqueue(
         () -> {
@@ -346,7 +382,15 @@ public final class RedisVelocityService implements AutoCloseable {
             return;
           }
           try {
-            redis.set(VanishMessages.SNAPSHOT_KEY, VanishMessages.encode(store.snapshot()));
+            publishPendingPublications();
+            VanishState snapshot = store.snapshot();
+            redis.set(VanishMessages.SNAPSHOT_KEY, VanishMessages.encode(snapshot));
+            if (announceSnapshot) {
+              redis.publish(
+                  VanishMessages.RESPONSES_CHANNEL,
+                  VanishMessages.encode(
+                      new SnapshotResponse(UUID.randomUUID(), "startup", snapshot)));
+            }
             redisAvailable = true;
             result.complete(null);
           } catch (RuntimeException failure) {
@@ -356,6 +400,19 @@ public final class RedisVelocityService implements AutoCloseable {
         },
         result);
     return result;
+  }
+
+  private void publishPendingPublications() {
+    while (!pendingPublications.isEmpty()) {
+      PendingPublication pending = pendingPublications.peekFirst();
+      publishMutation(pending.snapshot(), pending.delta());
+      pendingPublications.removeFirst();
+    }
+  }
+
+  private void publishMutation(VanishState snapshot, StateDelta delta) {
+    redis.set(VanishMessages.SNAPSHOT_KEY, VanishMessages.encode(snapshot));
+    redis.publish(VanishMessages.EVENTS_CHANNEL, VanishMessages.encode(delta));
   }
 
   private void notifyStateListeners(VanishState state) {
@@ -435,6 +492,8 @@ public final class RedisVelocityService implements AutoCloseable {
     return cause;
   }
 
+  private record PendingPublication(VanishState snapshot, StateDelta delta) {}
+
   interface RedisClient extends AutoCloseable {
     String get(String key);
 
@@ -449,6 +508,9 @@ public final class RedisVelocityService implements AutoCloseable {
       subscribe(receiver, channels);
     }
 
+    /** Closes an active blocking subscription before the client pool shuts down. */
+    default void closeSubscription() {}
+
     @Override
     void close();
   }
@@ -457,6 +519,9 @@ public final class RedisVelocityService implements AutoCloseable {
     private final HostAndPort hostAndPort;
     private final DefaultJedisClientConfig jedisConfig;
     private final JedisPool pool;
+    private final Object subscriptionLock = new Object();
+    private volatile Jedis activeSubscription;
+    private volatile JedisPubSub activePubSub;
 
     private JedisRedisClient(VelocityConfig config) {
       hostAndPort = new HostAndPort(config.host(), config.port());
@@ -487,20 +552,64 @@ public final class RedisVelocityService implements AutoCloseable {
     @Override
     public void subscribe(
         BiConsumer<String, String> receiver, Runnable onConnected, String... channels) {
-      try (Jedis connection = new Jedis(hostAndPort, jedisConfig)) {
-        connection.subscribe(
-            new JedisPubSub() {
-              @Override
-              public void onSubscribe(String channel, int subscribedChannels) {
-                onConnected.run();
-              }
+      Jedis connection = new Jedis(hostAndPort, jedisConfig);
+      JedisPubSub subscription =
+          new JedisPubSub() {
+            @Override
+            public void onSubscribe(String channel, int subscribedChannels) {
+              onConnected.run();
+            }
 
-              @Override
-              public void onMessage(String channel, String message) {
-                receiver.accept(channel, message);
-              }
-            },
-            channels);
+            @Override
+            public void onMessage(String channel, String message) {
+              receiver.accept(channel, message);
+            }
+          };
+      synchronized (subscriptionLock) {
+        activeSubscription = connection;
+        activePubSub = subscription;
+      }
+      try (connection) {
+        connection.subscribe(subscription, channels);
+      } finally {
+        synchronized (subscriptionLock) {
+          if (activeSubscription == connection) {
+            activeSubscription = null;
+            activePubSub = null;
+          }
+        }
+      }
+    }
+
+    @Override
+    public void closeSubscription() {
+      Jedis connection;
+      JedisPubSub subscription;
+      synchronized (subscriptionLock) {
+        connection = activeSubscription;
+        subscription = activePubSub;
+        activeSubscription = null;
+        activePubSub = null;
+      }
+      RuntimeException failure = null;
+      if (subscription != null) {
+        try {
+          subscription.unsubscribe();
+        } catch (RuntimeException exception) {
+          failure = exception;
+        }
+      }
+      if (connection != null) {
+        try {
+          connection.close();
+        } catch (RuntimeException exception) {
+          if (failure == null) {
+            failure = exception;
+          }
+        }
+      }
+      if (failure != null) {
+        throw failure;
       }
     }
 

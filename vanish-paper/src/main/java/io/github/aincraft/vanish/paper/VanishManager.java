@@ -46,6 +46,16 @@ public final class VanishManager {
     return state.snapshot();
   }
 
+  /** Returns whether the state is ready and has no known version gap. */
+  public boolean hasValidState() {
+    return state.ready() && !state.needsSnapshot();
+  }
+
+  /** Marks the cached state as stale until a full snapshot is applied. */
+  void markSnapshotNeeded() {
+    state.markSnapshotNeeded();
+  }
+
   /** Returns whether the authority state marks the player as vanished. */
   public boolean isVanished(UUID playerId) {
     return state.vanished().contains(playerId);

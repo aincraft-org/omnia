@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.aincraft.vanish.common.ChangeAck;
 import io.github.aincraft.vanish.common.ChangeRequest;
 import io.github.aincraft.vanish.common.SnapshotRequest;
+import io.github.aincraft.vanish.common.SnapshotResponse;
 import io.github.aincraft.vanish.common.StateDelta;
 import io.github.aincraft.vanish.common.VanishState;
 import java.time.Duration;
@@ -53,7 +54,7 @@ class RedisPaperServiceTest {
     FakeTransport transport = new FakeTransport();
     VanishManager manager = manager();
     RedisPaperService service = service(manager, transport, Duration.ofSeconds(1));
-    CompletableFuture<VanishState> snapshot = transport.snapshot;
+    final CompletableFuture<VanishState> snapshot = transport.snapshot;
 
     service.start();
     service.onSubscriptionReady();
@@ -148,6 +149,17 @@ class RedisPaperServiceTest {
     transport.snapshotRequestCompletion.complete(null);
 
     assertEquals(new VanishState(3, Set.of(TARGET)), join.join());
+  }
+
+  @Test
+  void unsolicitedStartupSnapshotResponseRefreshesCachedState() {
+    RedisPaperService service = service(manager(), new FakeTransport(), Duration.ofSeconds(1));
+    VanishState startup = new VanishState(4, Set.of(TARGET));
+
+    service.onSnapshotResponse(new SnapshotResponse(UUID.randomUUID(), "startup", startup));
+
+    assertEquals(startup, service.cachedSnapshot());
+    assertTrue(service.hasValidState());
   }
 
   @Test

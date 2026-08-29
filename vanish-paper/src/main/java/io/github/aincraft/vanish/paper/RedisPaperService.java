@@ -147,14 +147,16 @@ public final class RedisPaperService implements VanishTransport {
     }
   }
 
-  /** True after at least one valid snapshot has been applied to the local cache. */
+  /** True after a valid snapshot has been applied and no version gap is unresolved. */
   public boolean hasValidState() {
-    return validSnapshot;
+    synchronized (stateLock) {
+      return validSnapshot && manager.hasValidState() && queuedDeltas.isEmpty();
+    }
   }
 
-  /** Returns the latest state known by this backend without performing Redis I/O. */
+  /** Returns the latest authoritative state, or {@code null} while a version gap is pending. */
   public VanishState cachedSnapshot() {
-    return manager.snapshot();
+    return hasValidState() ? manager.snapshot() : null;
   }
 
   /** Reconciles from the durable snapshot, falling back to a snapshot request when necessary. */
@@ -166,7 +168,7 @@ public final class RedisPaperService implements VanishTransport {
     readSnapshot()
         .whenComplete(
             (state, error) -> {
-              if (error == null && state != null && validSnapshot && !hasPendingGap()) {
+              if (error == null && state != null && hasValidState()) {
                 resetRetryDelay();
                 result.complete(state);
                 return;
@@ -179,13 +181,10 @@ public final class RedisPaperService implements VanishTransport {
               requestSnapshotForReconciliation()
                   .whenComplete(
                       (snapshot, snapshotError) -> {
-                        if (snapshotError == null
-                            && snapshot != null
-                            && validSnapshot
-                            && !hasPendingGap()) {
+                        if (snapshotError == null && snapshot != null && hasValidState()) {
                           resetRetryDelay();
                           result.complete(snapshot);
-                        } else if (validSnapshot && !hasPendingGap()) {
+                        } else if (hasValidState()) {
                           result.complete(manager.snapshot());
                           scheduleRetry();
                         } else {
@@ -256,6 +255,7 @@ public final class RedisPaperService implements VanishTransport {
         return;
       }
       if (!validSnapshot || delta.version() != currentVersion + 1) {
+        manager.markSnapshotNeeded();
         queuedDeltas.putIfAbsent(delta.version(), delta);
         gap = true;
       } else {
@@ -301,12 +301,12 @@ public final class RedisPaperService implements VanishTransport {
     }
   }
 
-  /** Applies and completes a pending full snapshot response when its request ID matches. */
+  /** Applies a snapshot response and completes a matching pending request when present. */
   public void onSnapshotResponse(SnapshotResponse response) {
     java.util.Objects.requireNonNull(response, "response");
+    onStateSnapshot(response.state());
     CompletableFuture<SnapshotResponse> pending = pendingSnapshots.remove(response.requestId());
     if (pending != null) {
-      onStateSnapshot(response.state());
       pending.complete(response);
     }
   }
@@ -614,7 +614,7 @@ public final class RedisPaperService implements VanishTransport {
               if (error != null) {
                 result.completeExceptionally(unwrap(error));
                 scheduleRetry();
-              } else if (validSnapshot && !hasPendingGap()) {
+              } else if (hasValidState()) {
                 result.complete(manager.snapshot());
               } else {
                 result.completeExceptionally(

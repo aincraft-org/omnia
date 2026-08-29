@@ -1,10 +1,12 @@
 package io.github.aincraft.vanish.paper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.aincraft.vanish.common.ChangeAck;
 import io.github.aincraft.vanish.common.ChangeRequest;
 import io.github.aincraft.vanish.common.SnapshotRequest;
+import io.github.aincraft.vanish.common.StateDelta;
 import io.github.aincraft.vanish.common.VanishState;
 import java.net.InetAddress;
 import java.time.Duration;
@@ -61,6 +63,32 @@ class PlayerListenerTest {
     listener.onJoin(new PlayerJoinEvent(target.player(), ""));
 
     assertEquals(1, viewer.hideCalls());
+  }
+
+  @Test
+  void pendingGapFailsClosedUntilSufficientSnapshotArrives() throws Exception {
+    PaperTestDoubles.FakePlayer viewer = new PaperTestDoubles.FakePlayer(VIEWER, "Viewer");
+    PaperTestDoubles.FakePlayer target = new PaperTestDoubles.FakePlayer(TARGET, "Target");
+    FakeTransport transport = new FakeTransport();
+    VanishManager manager = manager(List.of(viewer, target));
+    RedisPaperService service = service(manager, transport);
+    service.onStateSnapshot(new VanishState(1, Set.of()));
+    service.onStateDelta(new StateDelta(3, TARGET, true));
+    PlayerListener listener = listener(manager, transport, service);
+
+    AsyncPlayerPreLoginEvent preLogin =
+        new AsyncPlayerPreLoginEvent(
+            "new-player", InetAddress.getLoopbackAddress(), UUID.randomUUID());
+    listener.onPreLogin(preLogin);
+    listener.onJoin(new PlayerJoinEvent(target.player(), ""));
+
+    assertEquals(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, preLogin.getLoginResult());
+    assertEquals(0, viewer.hideCalls());
+
+    service.onStateSnapshot(new VanishState(3, Set.of(TARGET)));
+
+    assertTrue(service.hasValidState());
+    assertTrue(viewer.hideCalls() > 0);
   }
 
   private PlayerListener listener(VanishManager manager, FakeTransport transport) {

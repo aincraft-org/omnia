@@ -18,6 +18,11 @@ public final class VersionedState {
     snapshotNeeded = false;
   }
 
+  /** Marks the state as requiring a full snapshot before it is authoritative again. */
+  public synchronized void markSnapshotNeeded() {
+    snapshotNeeded = true;
+  }
+
   /** Applies a contiguous delta, or records that a snapshot is needed for a gap. */
   public synchronized boolean applyDelta(StateDelta delta) {
     Objects.requireNonNull(delta, "delta");
