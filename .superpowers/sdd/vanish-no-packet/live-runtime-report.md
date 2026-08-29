@@ -146,7 +146,7 @@ This initial pre-fix run observed Redis TCP/subscriber reconnect, but durable sn
 | Separate entity hiding proof | NOT PROVEN; no correlated entity packet was captured |
 | Unvanish restoration | PASS at tab-packet level; `player_info action=29` observed by both clients |
 | Redis restart and subscriber resync | PASS in fixed follow-up; initial pre-fix run was not a pass |
-| Proxy restart and JSON reload | BLOCKED; not exercised as a client scenario |
+| Proxy restart and JSON reload | PASS in fixed follow-up; `vanish-state.json` retained the vanished UUID and a restarted proxy masked it for newly connected clients |
 | Permission see exemption/revocation | BLOCKED; not exercised |
 | Backend-offline state change and startup reconciliation | PASS in fixed follow-up; beta was offline during Target's vanish, then rejoined before Target's hidden destination arrival |
 | `/vservers`/`/vanishservers` filtering | PASS in fixed follow-up; `/vservers` omitted the beta server containing only vanished Target |
@@ -227,3 +227,20 @@ Selected observations:
 4. Target unvanished at `57.151s`; both clients received `player_info action=29` at `57.162s`. Observer's `/server beta` at `60.150s` then reached beta play login at `60.262s` and received Target's tab entry.
 
 The probe completed with `clients=2 firstLogins=2 events=62`. This proves the backend-offline state-change/restart reconciliation path for the fixed artifact. It does not establish a no-flicker or one-Paper-tick guarantee, and it did not exercise permission revocation or proxy JSON reload.
+
+## Fixed-artifact proxy restart and state reload follow-up
+
+A fifth task-owned run used proxy `28176`, lobby `38171`, alpha `38169`, beta `38170`, and Redis `16380` with the fixed artifacts. Target vanished at `18.152s`; the proxy was stopped after the state transition, and the persisted file contained:
+
+```text
+{"version":1,"vanished":{"db958d5e-bde2-36ef-8ccd-8577d5387953":true}}
+```
+
+Velocity restarted on the same data directory before the delayed reconnect probe. The first immediate two-client reconnect attempt hit Velocity's login-rate limiter for the second client, so the follow-up waited longer before reconnecting both identities. The successful delayed probe was `/tmp/vanish-nopacket-live-20260829/node-client/late_reload_probe.js`, with output at `/tmp/vanish-nopacket-live-20260829/node-client/late_reload_probe.log`.
+
+Selected observations from the delayed probe:
+
+1. Target reconnected after the proxy restart at `0.182s`, received a `player_remove` for its own UUID at `0.931s`, and reached beta at `4.282s`; the restarted proxy therefore loaded the persisted vanished state before the new session's destination transition.
+2. Observer reconnected at `10.256s`, reached alpha at `14.317s`, and requested `/server beta` at `20.152s`; Velocity returned `That server is unavailable.` at `20.154s` while the vanished Target was the only beta occupant.
+
+The probe completed with `clients=2 firstLogins=2 events=29`. This proves proxy restart/state-file reload and post-restart destination guarding for the fixed artifact. Permission see exemption/revocation, no-leak timing, and separate entity-packet attribution remain unexercised.
