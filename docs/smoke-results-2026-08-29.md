@@ -257,7 +257,28 @@ Current isolated assessment:
 | Local offline login through Velocity and `/server alpha`/`/server beta` routing | PASS for exercised transitions |
 | `/vanish` acknowledgement and observer tab packet masking/restoration | PASS at observed packet level |
 | Entity hiding, no-flicker timing, and one-Paper-tick destination guarantee | NOT PROVEN; the probe observed a Target tab add followed immediately by removal |
-| Redis restart and subscriber resync | BLOCKED/NOT PASS; subscribers returned but snapshot-key repair failed |
+| Redis restart and subscriber resync | PASS in fixed follow-up; the initial run's ephemeral-key repair failure is retained in the detailed report |
 | Proxy JSON reload, permission see exemption/revocation, `/vservers`, and full offline/empty-backend matrix | BLOCKED; not exercised |
 
 Detailed commands, logs, packet observations, client limitations, and cleanup proof are in `.superpowers/sdd/vanish-no-packet/live-runtime-report.md`. No FR-008, NMS, ProtocolLib, direct packet injection, permanent client dependency, or user-owned process change was introduced.
+
+## Fixed-artifact reconnect follow-up
+
+After the first live run, a regression test reproduced a transient Redis snapshot-write failure during the Velocity reconnect callback. The fix retries the durable snapshot repair with bounded backoff and stops scheduling after shutdown:
+
+```text
+./gradlew :vanish-velocity:test --tests io.github.aincraft.vanish.velocity.RedisVelocityServiceTest.transientReconnectFailureRetriesSnapshotRepair
+BUILD SUCCESSFUL
+```
+
+The fixed Velocity shadow jar was rebuilt with SHA-256 `eeedea17581ec991d2a6cc84dc2a3c269cc0505c874dd094262876252d26ce66`. A task-owned rerun used proxy `28176`, lobby `38171`, alpha `38169`, beta `38170`, and Redis `16380`. The current jar was loaded by Velocity; Redis was stopped and started as a fresh ephemeral container. Before the restart, Redis returned:
+
+```text
+{"schema":1,"type":"vanish_state","version":3,"vanished":["db958d5e-bde2-36ef-8ccd-8577d5387953"]}
+```
+
+After the restart and delayed repair retry, the same `GET vanish:state:snapshot` value returned. Velocity logs recorded one failed repair attempt followed by the retry path; the key was present after the retry. This updates the reconnect result for the fixed artifact only; it does not claim Redis persistence across loss of the Redis process's own storage.
+
+The two-client rerun log is `/tmp/vanish-nopacket-live-20260829/node-client/live_vanish_rerun.log`. It used the current Paper jar and the fixed Velocity jar, connected offline `Target` and `Observer` through Velocity, observed both clients on alpha, target vanish acknowledgement plus observer `player_remove`, target alpha-to-beta arrival, target unvanish acknowledgement with `player_info action=29` on both clients, observer beta arrival, and a final target vanish with `player_remove` on both clients. The temporary parser emitted 26.1/26.2 schema-size warnings; only the explicitly listed packets are relied upon.
+
+The earlier limitations remain: the live probe did not isolate entity spawn/destroy packets, did not exercise proxy JSON reload, see-permission revocation, `/vservers`, or the full offline/empty-backend matrix, and does not establish a no-flicker or one-Paper-tick guarantee. No FR-008 packet/NMS/ProtocolLib implementation was added.

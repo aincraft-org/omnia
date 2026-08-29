@@ -145,6 +145,26 @@ class RedisVelocityServiceTest {
   }
 
   @Test
+  void transientReconnectFailureRetriesSnapshotRepair() throws Exception {
+    FakeRedis redis = new FakeRedis();
+    VanishStateStore store = VanishStateStore.load(tempDir.resolve("state.json")).store();
+    RedisVelocityService service = service(redis, store);
+    service.start();
+    redis.operations.clear();
+    redis.failuresBeforeSet = 1;
+    CountDownLatch repaired = new CountDownLatch(1);
+    redis.onSnapshotSet = repaired::countDown;
+
+    service.onRedisDisconnect(new IllegalStateException("connection dropped"));
+    service.onRedisConnected();
+
+    assertTrue(repaired.await(2, TimeUnit.SECONDS));
+    assertTrue(awaitRedisAvailable(service));
+    assertEquals(new VanishState(0, Set.of()), VanishMessages.decodeVanishState(redis.snapshot));
+    service.close();
+  }
+
+  @Test
   void idempotentDesiredStateDoesNotPublishDelta() {
     FakeRedis redis = new FakeRedis();
     VanishStateStore store = VanishStateStore.load(tempDir.resolve("state.json")).store();
@@ -226,12 +246,21 @@ class RedisVelocityServiceTest {
     return new RedisVelocityService(store, redis, Runnable::run);
   }
 
+  private static boolean awaitRedisAvailable(RedisVelocityService service) throws Exception {
+    for (int attempt = 0; attempt < 200 && !service.redisAvailable(); attempt++) {
+      Thread.sleep(10);
+    }
+    return service.redisAvailable();
+  }
+
   private static final class FakeRedis implements RedisVelocityService.RedisClient {
     private final List<String> operations = new ArrayList<>();
     private final List<Published> published = new ArrayList<>();
     private final List<String> lifecycle = new ArrayList<>();
     private int failuresBeforePublish;
+    private int failuresBeforeSet;
     private Runnable onSubscribe;
+    private Runnable onSnapshotSet;
     private String snapshot;
 
     @Override
@@ -243,7 +272,14 @@ class RedisVelocityServiceTest {
     public void set(String key, String value) {
       operations.add("set:" + key + ":" + value);
       if (VanishMessages.SNAPSHOT_KEY.equals(key)) {
+        if (failuresBeforeSet > 0) {
+          failuresBeforeSet--;
+          throw new IllegalStateException("simulated Redis snapshot write failure");
+        }
         snapshot = value;
+        if (onSnapshotSet != null) {
+          onSnapshotSet.run();
+        }
       }
     }
 

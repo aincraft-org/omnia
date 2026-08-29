@@ -20,6 +20,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -55,7 +56,9 @@ public final class RedisVelocityService implements AutoCloseable {
   private final CopyOnWriteArrayList<Consumer<VanishState>> stateListeners =
       new CopyOnWriteArrayList<>();
   private final Deque<PendingPublication> pendingPublications = new ArrayDeque<>();
+  private final AtomicBoolean reconnectRepairPending = new AtomicBoolean();
   private volatile boolean redisAvailable;
+  private volatile long reconnectRetryDelayMillis;
 
   /** Creates the production Jedis-backed authority. */
   public RedisVelocityService(VanishStateStore store, VelocityConfig config) {
@@ -75,6 +78,7 @@ public final class RedisVelocityService implements AutoCloseable {
     this.closeExecutors = true;
     this.redis = new JedisRedisClient(config);
     this.redisAvailable = false;
+    this.reconnectRetryDelayMillis = config.retryInitialMillis();
   }
 
   /** Creates an executor-backed service around an injected Redis client for deterministic tests. */
@@ -96,6 +100,7 @@ public final class RedisVelocityService implements AutoCloseable {
     this.subscriberExecutor = subscriberExecutor;
     this.closeExecutors = false;
     this.redisAvailable = true;
+    this.reconnectRetryDelayMillis = VelocityConfig.DEFAULT_RETRY_INITIAL_MILLIS;
   }
 
   /** Starts durable-key reconciliation before the blocking Redis request subscriber. */
@@ -449,16 +454,43 @@ public final class RedisVelocityService implements AutoCloseable {
   }
 
   void onRedisConnected() {
-    if (!closed.get()) {
-      onRedisReconnect()
-          .whenComplete(
-              (ignored, failure) -> {
-                if (failure != null) {
-                  logger.log(
-                      Level.WARNING, "Unable to repair the Redis vanish snapshot", unwrap(failure));
-                }
-              });
+    if (!closed.get() && reconnectRepairPending.compareAndSet(false, true)) {
+      attemptReconnectRepair();
     }
+  }
+
+  private void attemptReconnectRepair() {
+    if (closed.get()) {
+      reconnectRepairPending.set(false);
+      return;
+    }
+    onRedisReconnect()
+        .whenComplete(
+            (ignored, failure) -> {
+              if (failure == null) {
+                reconnectRetryDelayMillis =
+                    config == null
+                        ? VelocityConfig.DEFAULT_RETRY_INITIAL_MILLIS
+                        : config.retryInitialMillis();
+                reconnectRepairPending.set(false);
+                return;
+              }
+              logger.log(
+                  Level.WARNING, "Unable to repair the Redis vanish snapshot", unwrap(failure));
+              if (closed.get()) {
+                reconnectRepairPending.set(false);
+                return;
+              }
+              long maximum =
+                  config == null
+                      ? VelocityConfig.DEFAULT_RETRY_MAX_MILLIS
+                      : config.retryMaxMillis();
+              long delay = reconnectRetryDelayMillis;
+              reconnectRetryDelayMillis =
+                  Math.min(maximum, delay > maximum / 2 ? maximum : delay * 2);
+              CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS, operationExecutor)
+                  .execute(this::attemptReconnectRepair);
+            });
   }
 
   private void sleepBeforeReconnect() {
