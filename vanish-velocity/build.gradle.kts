@@ -9,6 +9,7 @@ plugins {
     id("com.diffplug.spotless") version "8.10.0"
     id("com.github.spotbugs") version "6.5.10"
     id("com.gradleup.shadow") version "9.6.1"
+    id("io.github.development-network")
 }
 
 java {

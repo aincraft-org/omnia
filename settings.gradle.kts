@@ -17,6 +17,7 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
+includeBuild("/home/jlo/dev/omnia/.agents/skills/development-network/network")
 
 rootProject.name = "vanish-nopacket"
 include("vanish-common", "vanish-paper", "vanish-velocity")
