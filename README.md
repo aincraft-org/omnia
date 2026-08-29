@@ -123,7 +123,7 @@ Messages use schema version `1` and strict JSON envelopes. A full state is encod
 
 Delta messages contain `schema`, `type: "state_delta"`, `version`, `playerId`, and `vanished`. Change requests contain `requestId`, `playerId`, and desired `vanished`; snapshot requests contain `requestId` and `backendId`; responses contain the request ID, backend ID, and state; acknowledgements contain request ID, `accepted`, `version`, and `error`.
 
-On startup, Velocity loads its local state, publishes a durable snapshot, and subscribes for requests. Each Paper backend subscribes to events and responses, then reconciles its cache from the durable Redis snapshot. If a subscriber starts late, misses a delta, or detects a non-contiguous version, it requests a full snapshot through `vanish:state:requests`. Deltas are applied only when contiguous; stale deltas are ignored. Redis reconnects restart subscription/reconciliation with bounded backoff (`retry-initial-*` through `retry-max-*`). Join and pre-login paths reconcile before applying visibility; a valid cached state may be used while a fresh read is retried.
+On startup, Velocity loads its local state, publishes a durable snapshot, and subscribes for requests. Each Paper backend subscribes to events and responses, then reconciles its cache from the durable Redis snapshot. If a subscriber starts late, misses a delta, or detects a non-contiguous version, it requests a full snapshot through `vanish:state:requests`. Deltas are applied only when contiguous; stale deltas are ignored. Paper Redis reconnects use bounded exponential retry (`retry-initial-ms` through `retry-max-ms`); Velocity retries its subscriber at the configured `retry-initial-millis` delay and repairs the durable snapshot after a successful connection. Join and pre-login paths reconcile before applying visibility; a valid cached state may be used while a fresh read is retried.
 
 ## Exact state-file schema
 
@@ -144,7 +144,7 @@ The Velocity `state-file` is **not** the Redis envelope. It must be a strict JSO
 - Unknown top-level fields, non-canonical UUIDs, non-boolean values, negative versions, trailing JSON, or malformed JSON are rejected.
 - Writes use a temporary file and atomic replacement.
 
-If the file is corrupt or unreadable, the proxy preserves it as `vanish-state.json.bak` (or a unique UUID-suffixed `.bak` if that exists), loads an empty invalid state, disables mutations and Redis publication, and does not register the active proxy handlers. This is fail-closed recovery: repair or remove the preserved backup only after investigating it, then restart the proxy. Do not hand-edit a live file while the proxy is running.
+If the file is corrupt or unreadable, the proxy preserves it beside the configured `state-file` path using the original filename plus `.bak` (for the default `vanish-state.json`, this is `vanish-state.json.bak`; an existing backup receives a unique UUID suffix), loads an empty invalid state, disables mutations and Redis publication, and does not register the active proxy handlers. This is fail-closed recovery: repair or remove the preserved backup only after investigating it, then restart the proxy. Do not hand-edit a live file while the proxy is running.
 
 ## Evidence and limitations
 
