@@ -143,7 +143,7 @@ This initial pre-fix run observed Redis TCP/subscriber reconnect, but durable sn
 | Vanish acknowledgement | PASS for Target's observed server chat acknowledgement |
 | Observer's pre-vanish target tab entry | PASS; `player_info` observed |
 | Observer-side hide after Target moves alpha -> beta | PARTIAL; `player_info` add then `player_remove` observed at the same client timestamp |
-| Separate entity hiding proof | NOT PROVEN; no correlated entity packet was captured |
+| Separate entity hiding proof | PASS at Paper-managed packet level in fixed follow-up; non-see Observer received Target entity destroy on vanish and entity spawn on unvanish |
 | Unvanish restoration | PASS at tab-packet level; `player_info action=29` observed by both clients |
 | Redis restart and subscriber resync | PASS in fixed follow-up; initial pre-fix run was not a pass |
 | Proxy restart and JSON reload | PASS in fixed follow-up; `vanish-state.json` retained the vanished UUID and a restarted proxy masked it for newly connected clients |
@@ -151,7 +151,7 @@ This initial pre-fix run observed Redis TCP/subscriber reconnect, but durable sn
 | Backend-offline state change and startup reconciliation | PASS in fixed follow-up; beta was offline during Target's vanish, then rejoined before Target's hidden destination arrival |
 | `/vservers`/`/vanishservers` filtering | PASS in fixed follow-up; `/vservers` omitted the beta server containing only vanished Target |
 | Empty backend reconciliation and built-in `/server` guard | PASS in fixed follow-up; Observer entered empty beta while Target was vanished elsewhere, then `/vservers` omitted beta and `/server beta` returned `That server is unavailable.` |
-| Full no-leak timing matrix and separate entity hiding proof | NOT PROVEN; no correlated entity packet or one-Paper-tick/no-flicker capture |
+| Full no-leak timing matrix and cross-backend entity transition guarantee | NOT PROVEN; no one-Paper-tick/no-flicker capture |
 No FR-008 implementation or direct packet/NMS/ProtocolLib path was opened.
 
 ## Cleanup evidence
@@ -189,7 +189,7 @@ Selected follow-up observations from `/tmp/vanish-nopacket-live-20260829/node-cl
 4. Target sent `/vanish` on beta at `32.154s`; both clients received `player_info action=29` for Target at `32.162s`, and Target received `Target is now visible.` at `32.175s`. This confirms beta had the authoritative vanished state before the command toggled it visible.
 5. Observer then sent `/server beta` at `36.154s`, received a beta play login at `36.239s`, and received Target in the beta tab list at `36.240s`. Target vanished again at `44.175s`; both clients received `player_remove` for Target at `44.190s`/`44.191s` and Target received the vanished acknowledgement at `44.235s`.
 
-The probe emitted known 26.1/26.2 schema-size warnings, so the report relies only on the explicitly decoded login, server-chat, player-info, and player-remove packets. It proves real two-client Velocity routing and Paper-managed tab masking/restoration; it does not prove a separately attributable entity-spawn/entity-destroy transition, no-flicker timing, or a one-Paper-tick guarantee.
+The probe emitted known 26.1/26.2 schema-size warnings, so the report relies only on the explicitly decoded login, server-chat, player-info, and player-remove packets. It proves real two-client Velocity routing and Paper-managed tab masking/restoration for that probe; the separate non-see entity probe below supplies the local Paper entity transition evidence. Neither probe establishes no-flicker timing or a one-Paper-tick cross-backend guarantee.
 
 The fixed Redis reconnect check started the proxy with the prior durable state at version `3`, stopped the task-owned ephemeral Redis container, started a fresh container, and observed the fixed proxy's retry path restore the key. `GET vanish:state:snapshot` before and after repair returned:
 
@@ -199,7 +199,7 @@ The fixed Redis reconnect check started the proxy with the prior durable state a
 
 Velocity logs recorded one failed repair attempt followed by the delayed retry. This proves reconnect repair for the current artifact; it does not claim Redis can retain a key after its own storage is destroyed.
 
-The original required-port run and the first ephemeral Redis restart failure remain preserved as historical evidence. Backend-offline transitions, permission see exemption/revocation, proxy JSON reload, and the full no-leak timing matrix remain unexercised. The fixed follow-up now covers empty-backend reconciliation, `/vservers` filtering, and the built-in `/server` guard. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
+The original required-port run and the first ephemeral Redis restart failure remain preserved as historical evidence. The fixed follow-ups cover empty-backend reconciliation, backend-offline restart reconciliation, proxy state-file reload, configured see exemption/revocation, `/vservers` filtering, the built-in `/server` guard, and local Paper entity hide/show. The full no-leak timing matrix and a one-Paper-tick cross-backend guarantee remain unproven. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
 
 ## Fixed-artifact empty-backend and server-filter follow-up
 
@@ -213,7 +213,7 @@ Selected observations:
 4. Observer requested `/server beta` at `42.151s`; Velocity returned `That server is unavailable.` at `42.152s`. After Target unvanished on beta at `46.151s`, both clients received `player_info action=29` at `46.160s`/`46.161s`; Observer's `/server beta` at `48.151s` then reached beta login at `48.221s` and received Target's tab entry at `48.222s`.
 
 
-The probe completed with `clients=2 firstLogins=2 events=70`. This adds direct evidence for empty-backend reconciliation, `/vservers` filtering, and the built-in server guard. The subsequent fixed follow-up covers backend-offline state change and restart reconciliation; permission exemption/revocation, proxy JSON reload, and no-leak timing remain unexercised. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
+The probe completed with `clients=2 firstLogins=2 events=70`. This adds direct evidence for empty-backend reconciliation, `/vservers` filtering, and the built-in server guard. Subsequent fixed follow-ups cover backend-offline state change/restart reconciliation, proxy state reload, and see-permission exemption/revocation; no-leak timing remains unexercised. No FR-008, NMS, ProtocolLib, direct packet injection, or permanent client dependency was added.
 
 ## Fixed-artifact backend-offline follow-up
 
@@ -226,7 +226,7 @@ Selected observations:
 3. Observer sent `/server beta` at `52.150s` while Target was the only vanished player there; Velocity returned `That server is unavailable.` at `52.154s`.
 4. Target unvanished at `57.151s`; both clients received `player_info action=29` at `57.162s`. Observer's `/server beta` at `60.150s` then reached beta play login at `60.262s` and received Target's tab entry.
 
-The probe completed with `clients=2 firstLogins=2 events=62`. This proves the backend-offline state-change/restart reconciliation path for the fixed artifact. It does not establish a no-flicker or one-Paper-tick guarantee, and it did not exercise permission revocation or proxy JSON reload.
+The probe completed with `clients=2 firstLogins=2 events=62`. This proves the backend-offline state-change/restart reconciliation path for the fixed artifact. It does not establish a no-flicker or one-Paper-tick guarantee.
 
 ## Fixed-artifact proxy restart and state reload follow-up
 
@@ -243,7 +243,7 @@ Selected observations from the delayed probe:
 1. Target reconnected after the proxy restart at `0.182s`, received a `player_remove` for its own UUID at `0.931s`, and reached beta at `4.282s`; the restarted proxy therefore loaded the persisted vanished state before the new session's destination transition.
 2. Observer reconnected at `10.256s`, reached alpha at `14.317s`, and requested `/server beta` at `20.152s`; Velocity returned `That server is unavailable.` at `20.154s` while the vanished Target was the only beta occupant.
 
-The probe completed with `clients=2 firstLogins=2 events=29`. This proves proxy restart/state-file reload and post-restart destination guarding for the fixed artifact. No-leak timing and separate entity-packet attribution remain unexercised.
+The probe completed with `clients=2 firstLogins=2 events=29`. This proves proxy restart/state-file reload and post-restart destination guarding for the fixed artifact. No-leak timing remains unexercised; the separate non-see entity probe below supplies local entity transition evidence.
 
 ## Fixed-artifact see exemption and revocation follow-up
 
@@ -255,3 +255,15 @@ Selected observations from `/tmp/vanish-nopacket-live-20260829/node-client/see_p
 2. The proxy was stopped, `see-uuids` was changed to `false`, and Velocity restarted with the same persisted state. The delayed revoked-viewer probe `/tmp/vanish-nopacket-live-20260829/node-client/late_reload_probe.log` reconnected Observer at `10.261s`; its `/server beta` at `20.154s` returned `That server is unavailable.` while Target remained vanished on beta. This proves revocation after configuration reload/restart.
 
 The see probe completed with `clients=2 firstLogins=2 events=49`; the revoked-viewer probe completed with `clients=2 firstLogins=2 events=27`. This covers configured Velocity see exemption and restart-based revocation. It does not claim a hot-reload API, because the plugin reads `see-uuids` at initialization.
+
+## Fixed-artifact Paper entity visibility follow-up
+
+A seventh task-owned run used proxy `28176`, lobby `38171`, alpha `38169`, beta `38170`, and Redis `16380` with `see-uuids: false`. Observer was removed from the Paper `ops.json` files while Target remained operator-level, so the backend test exercised a genuinely non-see viewer. The focused probe was `/tmp/vanish-nopacket-live-20260829/node-client/entity_transition_probe.js`, with output at `/tmp/vanish-nopacket-live-20260829/node-client/entity_transition_probe.log`.
+
+Selected observations:
+
+1. Observer reached alpha and received Target's Paper-managed player entity spawn at `14.570s` (`entityId=117`, type `156`).
+2. Target sent `/vanish` at `20.150s`; Target received `Target is now vanished.` at `20.218s`, and Observer received `target_entity_destroy entityId=117` at `20.219s`.
+3. Target sent `/vanish` at `28.150s`; Observer received `player_info action=29` at `28.156s` and `target_entity_spawn entityId=117` at `28.167s`; Target received `Target is now visible.` at `28.167s`.
+
+The probe completed with `clients=2 targetEntityIds={"Observer":117} events=16`. This is direct packet observation of Paper API-only entity hide/show for a non-see viewer; it does not claim zero wire packets, no-flicker timing, or a one-Paper-tick cross-backend destination guarantee. No FR-008, NMS, ProtocolLib, or hand-crafted packet path was added.

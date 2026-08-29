@@ -148,6 +148,6 @@ If the file is corrupt or unreadable, the proxy attempts to preserve it beside t
 
 ## Evidence and limitations
 
-The [Paper API visibility POC](docs/poc-results-2026-08-29.md) and [cross-backend smoke record](docs/smoke-results-2026-08-29.md) are the complete runtime evidence for this work. Both records explicitly mark the required live matrix **BLOCKED** because user-owned listeners occupied the harness endpoints and its lobby-port gate prevented startup. Redis readiness and jar packaging passed, but no client connected and no blocked scenario is a runtime PASS. No live convergence, one-tick destination timing, tab behavior, or flicker/leak timing claim is made here.
+The [Paper API visibility POC](docs/poc-results-2026-08-29.md) and [cross-backend smoke record](docs/smoke-results-2026-08-29.md) are the complete runtime evidence for this work. The required shared-port matrix remains **BLOCKED** because user-owned listeners occupied the harness endpoints and its lobby-port gate prevented startup. Separate task-owned alternate-port runs provide selected two-client Velocity routing, tab masking/restoration, local Paper entity hide/show for a non-see viewer, backend reconciliation, proxy state reload, configured see exemption/revocation, destination filtering/guarding, and fixed Redis snapshot repair. No no-flicker, one-Paper-tick cross-backend, or zero-wire-packet claim is made.
 
 See [`content/docs/`](content/docs/) for a guided setup and operator walkthrough.

@@ -31,4 +31,4 @@ A destination is hidden only when every player connected to it is vanished. If a
 
 ## Moving between backends
 
-When a vanished player changes backend, the proxy keeps the authoritative state and the destination Paper backend reconciles it on join. Existing viewers reconcile when state changes, join, change world, and during the periodic maintenance pass. The dated smoke record reports these live scenarios as **BLOCKED**, so no timing or no-flicker claim is made from this repository's evidence.
+When a vanished player changes backend, the proxy keeps the authoritative state and the destination Paper backend reconciles it on join. Existing viewers reconcile when state changes, join, change world, and during the periodic maintenance pass. The required shared-port smoke matrix remains **BLOCKED**, while the alternate-port report records selected live cross-backend transitions. No no-flicker or one-Paper-tick guarantee is claimed.
